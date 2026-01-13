@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "317798552888",
+    "project_id": "ai-life-copilot-eaeb1",
+    "storage_bucket": "ai-life-copilot-eaeb1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:317798552888:android:a7a8577c9985aa80e41dcd",
+        "android_client_info": {
+          "package_name": "com.hamza.ailifecopilot"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "317798552888-6jbeods22t2sv9i3pqnr3bkbf4h7cuab.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hamza.ailifecopilot",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "317798552888-80gm01d44c2n22cmi4p7gpn8a5flf1q8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJFNWxiUdec4jUboNHsPjfAsG6c-deGZ0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "317798552888-80gm01d44c2n22cmi4p7gpn8a5flf1q8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
