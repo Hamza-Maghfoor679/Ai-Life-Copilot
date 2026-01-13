@@ -12,7 +12,7 @@ const Header = ({initialText, children}: HeaderProps) => {
   return (
     <View
       style={{
-        height: height * 0.2,
+        height: height * 0.17,
         backgroundColor: "#234C6A",
         borderBottomEndRadius: 20,
         borderBottomStartRadius: 20,

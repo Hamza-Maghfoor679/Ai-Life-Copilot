@@ -11,12 +11,14 @@ interface DefaultButtonProps {
   icon?: React.ReactNode; // pass any icon component
   iconPosition?: "left" | "right" | "center"; // icon placement
   spacing?: number; // space between icon and text
+  disabled?: boolean;
 }
 
 const DefaultButton: React.FC<DefaultButtonProps> = ({
   title,
   onPress,
-  backgroundColor = "#111827",
+  disabled = false,
+  backgroundColor = disabled ? '#586974' : "#234C6A",
   textColor = "#fff",
   style = {},
   textStyle = {},
@@ -43,6 +45,7 @@ const DefaultButton: React.FC<DefaultButtonProps> = ({
       style={[styles.button, { backgroundColor }, style]}
       onPress={onPress}
       activeOpacity={0.8}
+      disabled={disabled}
     >
       {renderContent()}
     </TouchableOpacity>

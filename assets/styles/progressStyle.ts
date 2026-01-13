@@ -1,0 +1,111 @@
+import { StyleSheet } from "react-native";
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f8fafc",
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  banner: {
+    backgroundColor: "#234C6A",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  bannerText: {
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "center",
+    color: "#fff",
+    lineHeight: 22,
+  },
+  footer: {
+    height: 70,
+    backgroundColor: "#234C6A",
+    justifyContent: "center",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#1e3a52",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: -2 },
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  footerText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+});
+
+// MODAL STYLES
+export const localStyles = StyleSheet.create({
+  modalContent: {
+    alignItems: "center",
+    padding: 16,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0f172a",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  statusBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statusText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+    letterSpacing: 0.3,
+  },
+  modalDescription: {
+    fontSize: 15,
+    color: "#475569",
+    lineHeight: 24,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  closeButton: {
+    backgroundColor: "#234C6A",
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    width: "100%",
+    shadowColor: "#234C6A",
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontWeight: "800",
+    textAlign: "center",
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
+});
