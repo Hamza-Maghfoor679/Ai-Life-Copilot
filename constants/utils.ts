@@ -145,3 +145,18 @@ export type IntentionStatus = "Completed" | "In Progress" | "Not Started";
     description: "Profile preferences and notification thresholds were successfully updated and saved.",
   },
 ];
+
+export type Mood =
+  | "happy"
+  | "neutral"
+  | "sad"
+  | "angry"
+  | "tired";
+
+export const moodMap = [
+  "happy",   // 😃
+  "neutral", // 😐
+  "sad",     // 😔
+  "angry",   // 😡
+  "tired",   // 😓
+] as const;

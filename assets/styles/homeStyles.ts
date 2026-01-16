@@ -5,13 +5,13 @@ export const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     padding: 16,
-    justifyContent: 'space-evenly',
+    justifyContent: "space-evenly",
   },
   scoreContainer: {
     width: "100%",
     marginBottom: 16,
     paddingVertical: 20,
-    justifyContent: 'center',
+    justifyContent: "center",
     backgroundColor: "#2a3d56",
     alignItems: "center",
     borderRadius: 12,
@@ -21,7 +21,13 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#ffffff",
-    textDecorationLine: 'underline'
+    textDecorationLine: "underline",
+  },
+  weeklyText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#d3cece",
+    marginTop: 5
   },
   name: {
     fontSize: 24,
@@ -70,7 +76,7 @@ export const styles = StyleSheet.create({
     justifyContent: "space-around",
     width: "100%",
     marginTop: 10,
-    flexWrap: 'wrap'
+    flexWrap: "wrap",
   },
   moodButton: {
     padding: 12,

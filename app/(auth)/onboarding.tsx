@@ -1,189 +1,233 @@
-import { styles } from "@/assets/styles/onboardingStyles";
+import { styles } from "@/assets/styles/authStackStyles/onboardingStyles";
 import {
+  onboardingCategories,
   OnboardingCategory,
-  onboardingQuestions,
 } from "@/src/constants/categoryQuestions";
-import { setAnswersInSlice } from '@/src/redux/slices/AnswersSlice';
-import CategoryCard from "@/src/reusables/CategoryCard";
-import CustomModal from "@/src/reusables/Modal";
+import { OnboardingSliderModal } from "@/src/reusables/SlidingModal";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import {
-  Alert,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useDispatch } from "react-redux";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
-const Onboarding = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] =
-    useState<OnboardingCategory | null>(null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answer, setAnswer] = useState("");
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [allAnswers, setAllAnswers] = useState<Record<string, string[]>>({});
-  const dispatch = useDispatch()
-  // Select a category and open modal
-  const handleSelect = (item: OnboardingCategory) => {
-    setSelectedCategory(item);
-    setIsOpen(true);
-    setCurrentQuestionIndex(0);
-
-    const storedAnswers = allAnswers[item.id] || [];
-    setAnswers(storedAnswers);
-    setAnswer(storedAnswers[0] || "");
-  };
-
-  // Move to next question or finish category
-  const handleNext = () => {
-    if (!answer.trim()) {
-      Alert.alert("Please enter an answer");
-      return;
-    }
-
-    const updatedAnswers = [...answers];
-    updatedAnswers[currentQuestionIndex] = answer;
-    setAnswers(updatedAnswers);
-    dispatch(setAnswersInSlice({answer: answers}))
-
-    if (selectedCategory && currentQuestionIndex + 1 < selectedCategory.questions.length) {
-      const nextIndex = currentQuestionIndex + 1;
-      setCurrentQuestionIndex(nextIndex);
-      setAnswer(updatedAnswers[nextIndex] || "");
-    } else {
-      if (selectedCategory) {
-        setAllAnswers((prev) => ({
-          ...prev,
-          [selectedCategory.id]: updatedAnswers,
-        }));
-      }
-
-      // Reset modal state
-      setIsOpen(false);
-      setSelectedCategory(null);
-      setCurrentQuestionIndex(0);
-      setAnswers([]);
-      setAnswer("");
-    }
-  };
-
-  // Previous question
-  const handlePrevious = () => {
-    if (currentQuestionIndex === 0) return;
-    const prevIndex = currentQuestionIndex - 1;
-    setCurrentQuestionIndex(prevIndex);
-    setAnswer(answers[prevIndex] || "");
-  };
-
-  // Check if all questions completed
-  const allCompleted = onboardingQuestions.every(
-    (category) => allAnswers[category.id]?.length === category.questions.length
-  );
-
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Welcome!</Text>
-        <Text style={styles.subtitle}>
-          Choose a category that best describes you
-        </Text>
-      </View>
-
-      {/* Category Grid */}
-      <View style={styles.grid}>
-        {onboardingQuestions.map((item) => (
-          <CategoryCard
-            key={item.id}
-            categoryTitle={item.title}
-            onPress={() => handleSelect(item)}
-          />
-        ))}
-      </View>
-
-      {/* User's Answers */}
-      <ScrollView style={styles.answersContainer}>
-        <Text style={{ fontWeight: "700", fontSize: 16, marginBottom: 12 }}>
-          Your answers so far
-        </Text>
-        {Object.entries(allAnswers).map(([categoryId, answersArray]) => {
-          const category = onboardingQuestions.find((c) => c.id === categoryId);
-          return (
-            <View key={categoryId} style={{ marginBottom: 16 }}>
-              <Text style={styles.answerCategory}>{category?.title}:</Text>
-              {answersArray.map((ans, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.answerCard}
-                  onPress={() => {
-                    setSelectedCategory(category || null);
-                    setIsOpen(true);
-                    setAnswers(answersArray);
-                    setCurrentQuestionIndex(idx);
-                    setAnswer(ans);
-                  }}
-                >
-                  <Text>{ans}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      {/* Go to Login Button */}
-      {allCompleted && (
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={() => router.push("/(auth)/login")}
-        >
-          <Text style={styles.loginButtonText}>Go to Login</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Modal for Questions */}
-      <CustomModal visible={isOpen} onClose={() => setIsOpen(false)}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>
-            {selectedCategory?.questions[currentQuestionIndex]}
-          </Text>
-
-          <TextInput
-            style={styles.input}
-            value={answer}
-            onChangeText={setAnswer}
-            placeholder="Type your answer..."
-            multiline
-          />
-
-          <View style={styles.buttonsContainer}>
-            {currentQuestionIndex > 0 && (
-              <TouchableOpacity
-                style={styles.prevButton}
-                onPress={handlePrevious}
-              >
-                <Text style={styles.prevButtonText}>Previous</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-              <Text style={styles.nextButtonText}>
-                {selectedCategory &&
-                currentQuestionIndex + 1 === selectedCategory.questions.length
-                  ? "Finish"
-                  : "Next"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </CustomModal>
-    </SafeAreaView>
-  );
+export type OnboardingProfile = {
+  focusAreas: string[];
+  experienceLevel: "beginner" | "intermediate" | "advanced" | null;
+  preferredStyle: "strict" | "balanced" | "gentle" | null;
 };
 
-export default Onboarding;
+export default function OnboardingScreen() {
+  const [activeCategory, setActiveCategory] =
+    useState<OnboardingCategory | null>(null);
+
+  const [onboardingProfile, setOnboardingProfile] =
+    useState<OnboardingProfile>({
+      focusAreas: [],
+      experienceLevel: null,
+      preferredStyle: null,
+    });
+
+  const getCurrentIndices = () => {
+    if (!activeCategory) return [];
+
+    const options = activeCategory.options;
+
+    if (activeCategory.type === "focusAreas") {
+      return options
+        .map((opt, idx) =>
+          onboardingProfile.focusAreas.includes(opt.label) ? idx : -1
+        )
+        .filter((idx) => idx !== -1);
+    }
+
+    if (
+      activeCategory.type === "experienceLevel" &&
+      onboardingProfile.experienceLevel
+    ) {
+      const idx = options.findIndex(
+        (opt) => opt.label === onboardingProfile.experienceLevel
+      );
+      return idx !== -1 ? [idx] : [];
+    }
+
+    if (
+      activeCategory.type === "preferredStyle" &&
+      onboardingProfile.preferredStyle
+    ) {
+      const idx = options.findIndex(
+        (opt) => opt.label === onboardingProfile.preferredStyle
+      );
+      return idx !== -1 ? [idx] : [];
+    }
+
+    return [];
+  };
+
+  const handleSaveCategory = (
+    categoryId: string,
+    selectedIndices: number[]
+  ) => {
+    const category = onboardingCategories.find(
+      (cat) => cat.id === categoryId
+    );
+    if (!category) return;
+
+    const labels = selectedIndices.map(
+      (idx) => category.options[idx].label
+    );
+
+    setOnboardingProfile((prev) => {
+      switch (category.type) {
+        case "focusAreas":
+          return { ...prev, focusAreas: labels };
+        case "experienceLevel":
+          return { ...prev, experienceLevel: labels[0] as any };
+        case "preferredStyle":
+          return { ...prev, preferredStyle: labels[0] as any };
+        default:
+          return prev;
+      }
+    });
+
+    setActiveCategory(null);
+  };
+
+  const getCategoryProgress = (category: OnboardingCategory) => {
+    if (category.type === "focusAreas") {
+      return onboardingProfile.focusAreas.length > 0 ? 100 : 0;
+    }
+
+    if (category.type === "experienceLevel") {
+      return onboardingProfile.experienceLevel ? 100 : 0;
+    }
+
+    if (category.type === "preferredStyle") {
+      return onboardingProfile.preferredStyle ? 100 : 0;
+    }
+
+    return 0;
+  };
+
+  const getSelectedValue = (category: OnboardingCategory) => {
+    if (category.type === "focusAreas") {
+      return onboardingProfile.focusAreas.length
+        ? `${onboardingProfile.focusAreas.length} selected`
+        : "Not selected";
+    }
+
+    if (category.type === "experienceLevel") {
+      return onboardingProfile.experienceLevel ?? "Not selected";
+    }
+
+    if (category.type === "preferredStyle") {
+      return onboardingProfile.preferredStyle ?? "Not selected";
+    }
+
+    return "Not selected";
+  };
+
+  const isAllComplete =
+    onboardingProfile.focusAreas.length > 0 &&
+    onboardingProfile.experienceLevel !== null &&
+    onboardingProfile.preferredStyle !== null;
+
+  const handleFinish = () => {
+    router.push({
+      pathname: "/(auth)/login",
+      params: {
+        onboardingProfile: JSON.stringify(onboardingProfile),
+      },
+    });
+  };
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 140 }}
+      >
+        <View style={styles.header}>
+          <Text style={styles.heading}>Personalize Your Journey</Text>
+          <Text style={styles.subtitle}>
+            Help us tailor the experience to your needs
+          </Text>
+        </View>
+
+        <View style={styles.categoriesContainer}>
+          {onboardingCategories.map((cat, idx) => {
+            const isDone = getCategoryProgress(cat) === 100;
+
+            return (
+              <Pressable
+                key={cat.id}
+                onPress={() => setActiveCategory(cat)}
+                style={({ pressed }) => [
+                  styles.categoryCard,
+                  isDone && styles.categoryCardActive,
+                  pressed && styles.categoryCardPressed,
+                ]}
+              >
+                <View style={styles.categoryContent}>
+                  <View style={styles.categoryHeader}>
+                    <View
+                      style={[
+                        styles.categoryNumber,
+                        isDone && styles.categoryNumberDone,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.categoryNumberText,
+                          isDone && styles.categoryNumberTextDone,
+                        ]}
+                      >
+                        {isDone ? "✓" : idx + 1}
+                      </Text>
+                    </View>
+
+                    <View style={styles.categoryInfo}>
+                      <Text style={styles.categoryTitle}>{cat.title}</Text>
+                      <Text style={styles.categorySubtitle} numberOfLines={1}>
+                        {getSelectedValue(cat)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.progressBarContainer}>
+                    <View
+                      style={[
+                        styles.progressBar,
+                        { width: `${getCategoryProgress(cat)}%` },
+                      ]}
+                    />
+                  </View>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Pressable
+          onPress={handleFinish}
+          disabled={!isAllComplete}
+          style={[
+            styles.continueButton,
+            !isAllComplete && styles.continueButtonDisabled,
+          ]}
+        >
+          <Text style={styles.continueButtonText}>
+            {isAllComplete ? "Get Started" : "Complete Profile"}
+          </Text>
+        </Pressable>
+      </View>
+
+      <OnboardingSliderModal
+        visible={!!activeCategory}
+        category={activeCategory}
+        onClose={() => setActiveCategory(null)}
+        onSave={handleSaveCategory}
+        initialIndices={getCurrentIndices()}
+      />
+    </View>
+  );
+}

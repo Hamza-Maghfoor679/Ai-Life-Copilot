@@ -1,9 +1,15 @@
-// Import the functions you need from the SDKs you need
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeApp } from "firebase/app";
-import { getReactNativePersistence, GoogleAuthProvider, initializeAuth } from "firebase/auth";
+import {
+  getReactNativePersistence,
+  GoogleAuthProvider,
+  initializeAuth,
+} from "firebase/auth";
+import {
+  getFirestore
+} from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 
-// REMOVED: getAnalytics and isSupported - not needed for React Native
 
 const firebaseConfig = {
   apiKey: "AIzaSyACOBhSe6me2spW24d_eIaceijJIuOTJJU",
@@ -12,19 +18,25 @@ const firebaseConfig = {
   storageBucket: "ai-life-copilot-eaeb1.firebasestorage.app",
   messagingSenderId: "317798552888",
   appId: "1:317798552888:web:cad0e1c120189a3de41dcd",
-  measurementId: "G-12CLNYQT8B"
+  measurementId: "G-12CLNYQT8B",
 };
 
-// Initialize Firebase
+// Initialize Firebase app
 const app = initializeApp(firebaseConfig);
 
-// Initialize Auth with AsyncStorage persistence for React Native
+const functions = getFunctions(app);
+
+
+// Auth (React Native persistence)
 const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
+  persistence: getReactNativePersistence(AsyncStorage),
 });
 
-// Initialize Google Auth Provider
+// Firestore - Initialize AFTER app
+const db = getFirestore(app);
+
+// Google provider
 const googleAuthProvider = new GoogleAuthProvider();
 
-export { app, auth, googleAuthProvider };
+export { app, auth, db, functions, googleAuthProvider };
 

@@ -47,7 +47,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 10,
     backgroundColor: "rgba(0,0,0,0.5)",
-
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -56,6 +55,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 24,
     borderRadius: 10,
-    borderWidth: 2
+    borderWidth: 2,
   },
 });

@@ -7,7 +7,7 @@ const Splash = () => {
 
   useEffect(() => {
     setTimeout(() => {
-      router.replace('/(auth)/login')
+      router.replace('/(auth)/onboarding')
     }, 2000);
   }, [])
 

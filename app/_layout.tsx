@@ -10,6 +10,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
+import Toast from "react-native-toast-message";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 
@@ -18,6 +19,7 @@ export default function RootLayout() {
 
   return (
     <Provider store={store}>
+      <Toast />
       <PersistGate
         loading={
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>

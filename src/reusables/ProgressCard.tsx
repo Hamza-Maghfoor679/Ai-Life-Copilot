@@ -7,17 +7,21 @@ const ProgressCard = ({
   description,
   status,
   onPress,
+  mood,
+  userId
 }: {
   title: string;
   description?: string;
-  status?: "Pending" | "In Progress" | "Completed" | "Not Started";
+  status?: "Completed" | "Partial Completed" | "Missed" | "Not Completed";
   onPress: () => void;
+  mood?: string;
+  userId?: string
 }) => {
   const statusConfig: Record<string, { color: string; icon: any; bgColor: string }> = {
-    Pending: { color: "#f59e0b", icon: "time", bgColor: "#fef3c7" },
-    "In Progress": { color: "#3b82f6", icon: "hourglass", bgColor: "#dbeafe" },
     Completed: { color: "#10b981", icon: "checkmark-circle", bgColor: "#d1fae5" },
-    "Not Started": { color: "#94a3b8", icon: "close-circle", bgColor: "#f1f5f9" },
+    "Partial Completed": { color: "#f59e0b", icon: "hourglass", bgColor: "#fef3c7" },
+    Missed: { color: "#ef4444", icon: "close-circle", bgColor: "#fee2e2" },
+    "Not Completed": { color: "#94a3b8", icon: "time", bgColor: "#f1f5f9" },
   };
 
   const config = status ? statusConfig[status] : null;
@@ -33,7 +37,7 @@ const ProgressCard = ({
         {status && config && (
           <View style={[styles.statusBadge, { backgroundColor: config.bgColor }]}>
             <Ionicons
-              name={config.icon}
+              name={config.icon as any}
               size={13}
               color={config.color}
               style={{ marginRight: 4 }}
@@ -45,6 +49,9 @@ const ProgressCard = ({
         )}
       </View>
 
+      <View>
+        <Text style={styles.description}>{mood}</Text>
+      </View>
       {description && (
         <Text style={styles.description}>{description}</Text>
       )}
@@ -58,7 +65,7 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     borderWidth: 1.5,
-    borderColor: "#e2e8f0",
+    borderColor: "#2f63a6",
     padding: 16,
     borderRadius: 12,
     marginVertical: 8,
@@ -67,7 +74,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 5,
   },
   header: {
     flexDirection: "row",

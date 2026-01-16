@@ -1,21 +1,106 @@
-import { localStyles, styles } from "@/assets/styles/progressStyle";
-import { intentions } from "@/constants/utils";
+import { styles } from "@/assets/styles/progressStyle";
+import { auth, db } from "@/src/config/firebase";
 import Header from "@/src/reusables/Header";
-import CustomModal from "@/src/reusables/Modal"; // Import your Modal
+import LogDetailModal from "@/src/reusables/LogDetailModal";
 import ProgressCard from "@/src/reusables/ProgressCard";
 import { router } from "expo-router";
-import React, { useState } from "react";
-import { FlatList, Text, TouchableOpacity, View } from "react-native";
+import {
+  collection,
+  onSnapshot,
+  query,
+  Timestamp,
+  where,
+} from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Log } from "../types/utils";
+
+type StatusType =
+  | "Completed"
+  | "Partial Completed"
+  | "Missed"
+  | "Not Completed"
+  | undefined;
 
 const Progress = () => {
-  // 1. State for modal and selected data
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<Log | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
-  // 2. Open modal handler
-  const handlePressCard = (item: any) => {
-    setSelectedItem(item);
-    setIsModalVisible(true);
+  useEffect(() => {
+    let unsubscribeLogs: (() => void) | undefined;
+
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      // Kill any existing listener if the user changes
+      if (unsubscribeLogs) unsubscribeLogs();
+
+      if (!user) {
+        setLogs([]);
+        setLoading(false);
+        return;
+      }
+
+      // Use auth.currentUser.uid directly instead of user.uid
+      const currentUserId = user.uid;
+      console.log("Fetching logs for user:", currentUserId);
+
+      const logsRef = collection(db, "dailyLogs");
+      const q = query(logsRef, where("userId", "==", currentUserId));
+
+      unsubscribeLogs = onSnapshot(
+        q,
+        (querySnapshot) => {
+          const uniqueDataMap = new Map();
+
+          querySnapshot.docs.forEach((doc) => {
+            uniqueDataMap.set(doc.id, {
+              id: doc.id,
+              ...doc.data(),
+            });
+          });
+
+          const fetchedLogs = Array.from(uniqueDataMap.values()) as Log[];
+
+          // Sort by timestamp
+          fetchedLogs.sort((a, b) => {
+            const timeA =
+              a.createdAt instanceof Timestamp ? a.createdAt.toMillis() : 0;
+            const timeB =
+              b.createdAt instanceof Timestamp ? b.createdAt.toMillis() : 0;
+            return timeB - timeA;
+          });
+
+          console.log("Fetched logs:", fetchedLogs.length);
+          setLogs(fetchedLogs);
+          setLoading(false);
+        },
+        (error) => {
+          console.error("Firestore Listener Error:", error);
+          setLoading(false);
+        }
+      );
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeLogs) unsubscribeLogs();
+    };
+  }, []);
+
+  const mapOutcomeToStatus = (outcome?: string | null): StatusType => {
+    const map: Record<string, StatusType> = {
+      completed: "Completed",
+      partial: "Partial Completed",
+      missed: "Missed",
+    };
+    return map[outcome || ""] || "Not Completed";
   };
 
   return (
@@ -29,61 +114,55 @@ const Progress = () => {
           </Text>
         </View>
 
-        <FlatList
-          data={intentions}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <ProgressCard
-              title={item.title}
-              description={item.description}
-              status={item.status}
-              // 3. Ensure ProgressCard accepts an onPress prop
-              onPress={() => handlePressCard(item)}
-            />
-          )}
-          showsVerticalScrollIndicator={false}
-        />
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color="#6C5CE7"
+            style={{ marginTop: 50 }}
+          />
+        ) : (
+          <FlatList
+            data={logs}
+            keyExtractor={(item, index) => item.id || `index-${index}`}
+            renderItem={({ item }) => (
+              <ProgressCard
+                userId={item.userId}
+                title={item.intention || "Unnamed Intention"}
+                description={
+                  item.notes || `Planned: ${item.plannedDuration || 0} mins`
+                }
+                status={mapOutcomeToStatus(item.outcome)}
+                onPress={() => {
+                  setSelectedItem(item);
+                  setIsModalVisible(true);
+                }}
+                mood={`Difficulty: ${item.difficulty || "N/A"}`}
+              />
+            )}
+            ListEmptyComponent={
+              <View style={{ alignItems: "center", marginTop: 50 }}>
+                <Text style={{ color: "#999" }}>No daily logs found yet.</Text>
+              </View>
+            }
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
 
-      {/* 4. The Modal */}
-      <CustomModal 
-        visible={isModalVisible} 
+      <LogDetailModal
+        visible={isModalVisible}
+        item={selectedItem}
         onClose={() => setIsModalVisible(false)}
-      >
-        {selectedItem && (
-          <View style={localStyles.modalContent}>
-            <Text style={localStyles.modalTitle}>{selectedItem.title}</Text>
-            
-            <View style={[
-              localStyles.statusBadge, 
-              { backgroundColor: selectedItem.status === 'Completed' ? '#10b981' : '#3b82f6' }
-            ]}>
-              <Text style={localStyles.statusText}>{selectedItem.status}</Text>
-            </View>
+      />
 
-            <Text style={localStyles.modalDescription}>
-              {selectedItem.description}
-            </Text>
-
-            <TouchableOpacity 
-              style={localStyles.closeButton} 
-              onPress={() => setIsModalVisible(false)}
-            >
-              <Text style={localStyles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </CustomModal>
-
-      <TouchableOpacity 
-        style={styles.footer} 
-        onPress={() => router.push('/(progressStack)/History')}
+      <TouchableOpacity
+        style={styles.footer}
+        onPress={() => router.push("/(progressStack)/History")}
       >
         <Text style={styles.footerText}>History</Text>
       </TouchableOpacity>
     </View>
   );
 };
-
 
 export default Progress;

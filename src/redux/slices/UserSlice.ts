@@ -7,6 +7,7 @@ interface User {
   email: string | null;
   photoURL: string | null;
   token?: string;
+  currentScore?: number | null | string
 }
 
 interface UserState {
@@ -14,7 +15,7 @@ interface UserState {
 }
 
 const initialState: UserState = {
-  user: null,
+  user: null
 };
 
 export const UserSlice = createSlice({
@@ -32,8 +33,13 @@ export const UserSlice = createSlice({
         state.user.token = action.payload;
       }
     },
+    updateWeeklyScore: (state, action: PayloadAction<number | string>) => {
+      if (state.user) {
+        state.user.currentScore = action.payload
+      }
+    }
   },
 });
 
-export const { setUser, clearUser, setToken } = UserSlice.actions;
+export const { setUser, clearUser, setToken, updateWeeklyScore } = UserSlice.actions;
 export default UserSlice.reducer;

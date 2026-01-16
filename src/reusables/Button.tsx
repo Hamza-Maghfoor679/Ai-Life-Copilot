@@ -1,5 +1,13 @@
 import React from "react";
-import { StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from "react-native";
 
 interface DefaultButtonProps {
   title: string;
@@ -12,13 +20,15 @@ interface DefaultButtonProps {
   iconPosition?: "left" | "right" | "center"; // icon placement
   spacing?: number; // space between icon and text
   disabled?: boolean;
+  loading?: boolean; // NEW: loading state
 }
 
 const DefaultButton: React.FC<DefaultButtonProps> = ({
   title,
   onPress,
   disabled = false,
-  backgroundColor = disabled ? '#586974' : "#234C6A",
+  loading = false, // NEW
+  backgroundColor = "#234C6A",
   textColor = "#fff",
   style = {},
   textStyle = {},
@@ -26,8 +36,15 @@ const DefaultButton: React.FC<DefaultButtonProps> = ({
   iconPosition = "left",
   spacing = 8,
 }) => {
+  const isDisabled = disabled || loading; // button is disabled when loading
+
   const renderContent = () => {
-    if (!icon) return <Text style={[styles.text, textStyle, { color: textColor }]}>{title}</Text>;
+    if (loading) {
+      return <ActivityIndicator size="small" color={textColor} />;
+    }
+
+    if (!icon)
+      return <Text style={[styles.text, textStyle, { color: textColor }]}>{title}</Text>;
 
     const content = (
       <>
@@ -37,15 +54,23 @@ const DefaultButton: React.FC<DefaultButtonProps> = ({
       </>
     );
 
-    return <View style={[styles.content, iconPosition === "center" && { justifyContent: "center" }]}>{content}</View>;
+    return (
+      <View style={[styles.content, iconPosition === "center" && { justifyContent: "center" }]}>
+        {content}
+      </View>
+    );
   };
 
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor }, style]}
+      style={[
+        styles.button,
+        { backgroundColor: isDisabled ? "#586974" : backgroundColor },
+        style,
+      ]}
       onPress={onPress}
       activeOpacity={0.8}
-      disabled={disabled}
+      disabled={isDisabled}
     >
       {renderContent()}
     </TouchableOpacity>

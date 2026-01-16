@@ -1,10 +1,15 @@
 import { styles } from "@/assets/styles/homeStyles";
+import { auth, db } from "@/src/config/firebase";
+import { createDailyLog } from "@/src/helper/saveLog";
+import { cleanUndefined } from "@/src/helper/unwantedFields";
+import { updateWeeklyScore } from "@/src/redux/slices/UserSlice";
 import { RootState } from "@/src/redux/store";
 import DefaultButton from "@/src/reusables/Button";
 import SemiCircleGauge from "@/src/reusables/Gauge";
 import Header from "@/src/reusables/Header";
-import CustomModal from "@/src/reusables/Modal";
-import { useState } from "react";
+import { IntentionModal } from "@/src/reusables/IntentionModal";
+import { Timestamp, collection, doc, onSnapshot } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Keyboard,
@@ -16,39 +21,106 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
 const MainIndex = () => {
-  const [intention, setIntention] = useState<string>("");
-  const [description, setDescription] = useState<string>("");
+  const dispatch = useDispatch();
+
+  // State for Intentions
+  const [intention, setIntention] = useState("");
+  const [plannedDuration, setPlannedDuration] = useState<number | null>(null);
+  const [difficulty, setDifficulty] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
   const [selectedMood, setSelectedMood] = useState<number | null>(null);
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
+  // Redux Data
   const user = useSelector((state: RootState) => state.user?.user);
+  const currentScore = useSelector(
+    (state: RootState) => state.user?.user?.currentScore || 0
+  );
 
-  const handleIntention = () => {
-    setIsOpen(true);
+  // --- Real-time Score Listener ---
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // Listen to the user document for live score updates
+    const userRef = doc(db, "users", user.uid);
+
+    const unsubscribe = onSnapshot(
+      userRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          // Sync the score from Firebase to Redux
+          if (data.weeklyScore !== undefined) {
+            dispatch(updateWeeklyScore(data.weeklyScore));
+          }
+        }
+      },
+      (error) => {
+        console.error("Error listening to score updates:", error);
+      }
+    );
+
+    return () => unsubscribe(); // Cleanup listener
+  }, [user?.uid, dispatch]);
+
+  const handleOpenModal = () => setIsOpen(true);
+
+const handleSetIntention = async () => {
+  if (!user || !plannedDuration) return;
+  
+  // Add this guard
+  if (!auth.currentUser?.uid) {
+    return Alert.alert("Error", "User not authenticated");
+  }
+
+  const difficultyMap: Record<string, "easy" | "medium" | "hard"> = {
+    Easy: "easy",
+    Medium: "medium",
+    Hard: "hard",
   };
 
-  const handleDesc = () => {
-    Alert.alert(
-      "Intention Set",
-      `Your intention: ${intention}\nDescription: ${description}\nMood: ${
-        selectedMood !== null
-          ? ["😃", "😐", "😔", "😡", "😓"][selectedMood]
-          : "Not set"
-      }`
-    );
+  const moodMap = ["happy", "neutral", "sad", "angry", "tired"] as const;
+  const logRef = doc(collection(db, "dailyLogs"));
+
+  const dailyLog = cleanUndefined({
+    id: logRef.id,
+    userId: auth.currentUser.uid,  // Now it's guaranteed to be a string
+    date: new Date().toISOString().split("T")[0],
+    intention,
+    plannedDuration: plannedDuration * 60,
+    outcome: null,
+    difficulty: difficulty ? difficultyMap[difficulty] : undefined,
+    mood: selectedMood !== null ? moodMap[selectedMood] : undefined,
+    notes: notes.trim() ? notes : undefined,
+    completionQuality: null,
+    actualDuration: null,
+    createdAt: Timestamp.now(),
+  });
+
+  try {
+    setIsLoading(true);
+    await createDailyLog(dailyLog);
     setIsOpen(false);
     setIntention("");
-    setDescription("");
+    setPlannedDuration(null);
+    setDifficulty(null);
+    setNotes("");
     setSelectedMood(null);
-  };
-  const value = 20;
+    setIsLoading(false);
+    Alert.alert("Success", `Your intention "${intention}" has been saved.`);
+  } catch (error) {
+    console.error("Error saving daily log:", error);
+    setIsLoading(false);
+  }
+};
 
   return (
     <>
-      <Header initialText={`Welcome ${user?.name}`} />
+      <Header initialText={`Welcome ${user?.name || "User"}`} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -62,21 +134,30 @@ const MainIndex = () => {
         >
           <View style={styles.container}>
             <View style={styles.scoreContainer}>
-              <SemiCircleGauge radius={80} value={value} maxValue={100} />
-              <Text style={styles.scoreText}>Score: {value}</Text>
+              <SemiCircleGauge
+                radius={80}
+                value={Number(currentScore)}
+                maxValue={100}
+              />
+              <Text style={styles.scoreText}>Score: {currentScore}</Text>
+              <Text style={styles.weeklyText}>
+                Updated every 7 days based on your progress!
+              </Text>
             </View>
+
             <Text style={styles.text}>What is your intention for today?</Text>
             <Text style={styles.trackText}>
-              (Lets see how strongly do you want it!)
+              (Let’s see you deserve what you want!)
             </Text>
+
             <View style={styles.trackContainer}>
               <TextInput
                 value={intention}
-                onChange={(e) => setIntention(e.nativeEvent.text)}
+                onChangeText={setIntention}
                 multiline
-                placeholder="Write you desire here..."
+                placeholder="Write your desire here..."
                 style={styles.textInput}
-                placeholderTextColor={"#1e2631"}
+                placeholderTextColor="#1e2631"
                 onSubmitEditing={() => Keyboard.dismiss()}
               />
 
@@ -96,10 +177,16 @@ const MainIndex = () => {
                     </TouchableOpacity>
                   ))}
                 </View>
+
                 <DefaultButton
                   title="Lets Do It"
-                  style={{ width: "100%", marginTop: 16, borderWidth: 2, borderColor: '#000000' }}
-                  onPress={handleIntention}
+                  style={{
+                    width: "100%",
+                    marginTop: 16,
+                    borderWidth: 2,
+                    borderColor: "#000",
+                  }}
+                  onPress={handleOpenModal}
                   disabled={
                     intention.trim().length === 0 || selectedMood === null
                   }
@@ -109,43 +196,19 @@ const MainIndex = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <CustomModal visible={isOpen} onClose={() => setIsOpen(!isOpen)}>
-        <View style={{ alignItems: "center", minHeight: 100 }}>
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: "600",
-              textAlign: "center",
-            }}
-          >
-            Do you want to add description for your intention? (Optional)
-          </Text>
-          <Text
-            style={{
-              marginTop: 12,
-              fontSize: 15,
-              textAlign: "center",
-            }}
-          >
-            (This will help us to understand your intention better and provide
-            more accurate insights.)
-          </Text>
-          <TextInput
-            value={description}
-            onChange={(e) => setDescription(e.nativeEvent.text)}
-            multiline
-            placeholder="Write your intention description here..."
-            style={styles.textInput}
-            placeholderTextColor={"#1e2631"}
-            onSubmitEditing={() => Keyboard.dismiss()}
-          />
-          <DefaultButton
-            title="Set Intention"
-            style={{ width: "100%", marginTop: 16 }}
-            onPress={handleDesc}
-          />
-        </View>
-      </CustomModal>
+
+      <IntentionModal
+        loading={isLoading}
+        visible={isOpen}
+        onClose={() => setIsOpen(false)}
+        plannedDuration={plannedDuration}
+        difficulty={difficulty}
+        notes={notes}
+        onSetIntention={handleSetIntention}
+        onDurationChange={setPlannedDuration}
+        onDifficultyChange={setDifficulty}
+        onNotesChange={setNotes}
+      />
     </>
   );
 };
