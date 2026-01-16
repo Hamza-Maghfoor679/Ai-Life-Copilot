@@ -36,9 +36,9 @@ const MainIndex = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Redux Data
-  const user = useSelector((state: RootState) => state.user?.user);
+  const user = useSelector((state: RootState) => state.user.user);
   const currentScore = useSelector(
-    (state: RootState) => state.user?.user?.currentScore || 0
+    (state: RootState) => state.user.user?.currentScore || 0
   );
 
   // --- Real-time Score Listener ---

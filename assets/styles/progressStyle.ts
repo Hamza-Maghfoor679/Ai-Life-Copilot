@@ -223,20 +223,21 @@ export const localStyles = StyleSheet.create({
     justifyContent: "center",
   },
   starButton: {
-    paddingVertical: 4,
+    paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 8,
     backgroundColor: "#b7c1d7",
     borderWidth: 2,
-    borderColor: "#5a667d",
+    borderColor: "#8497bc",
+    flexWrap: 'wrap'
   },
   starButtonFilled: {
-    backgroundColor: "#3f4758",
-    borderColor: "#FCD34D",
+    backgroundColor: "#bfd2ae",
+    borderColor: "#000000",
   },
   star: {
     fontSize: 24,
-    color: "#f8ff25",
+    color: "#fbff8c",
   },
   qualityText: {
     fontSize: 13,

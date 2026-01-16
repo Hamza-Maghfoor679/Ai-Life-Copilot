@@ -10,7 +10,7 @@ export interface Log {
   intention: string;
   plannedDuration: number;
   actualDuration?: number | null;
-  outcome?: "completed" | "partial" | "missed" | null | string;
+  outcome?: "completed" | "partial Completed" | "missed" | null | string;
   completionQuality?: 1 | 2 | 3 | 4 | 5 | null;
   difficulty?: "easy" | "medium" | "hard";
   mood?: "happy" | "neutral" | "sad" | "angry" | "tired";

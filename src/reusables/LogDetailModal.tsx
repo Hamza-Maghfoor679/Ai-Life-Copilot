@@ -1,13 +1,13 @@
 import { Log } from "@/app/types/utils";
 import { localStyles } from "@/assets/styles/progressStyle";
-import { auth, db } from "@/src/config/firebase";
+import { db } from "@/src/config/firebase";
 import CustomModal from "@/src/reusables/Modal";
 import { doc, updateDoc } from "firebase/firestore";
 import React, { useState } from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import DefaultButton from "./Button";
 
-const emojis: Record<string, string> = {
+const EMOJIS = {
   neutral: "😐",
   happy: "😃",
   sad: "😔",
@@ -17,11 +17,97 @@ const emojis: Record<string, string> = {
   medium: "⚡",
   high: "🚀",
 };
+const FORM_SECTIONS = [
+  { label: "Energy Level", key: "energy", opts: ["low", "medium", "high"] },
+  {
+    label: "Outcome",
+    key: "outcome",
+    opts: ["completed", "partial", "missed"],
+  },
+];
 
 const StatRow = ({ label, value }: { label: string; value: any }) => (
   <View style={localStyles.metaRow}>
     <Text style={localStyles.metaLabel}>{label}</Text>
     <Text style={localStyles.metaValue}>{value}</Text>
+  </View>
+);
+
+const DurationControl = ({
+  duration,
+  onChange,
+}: {
+  duration: number;
+  onChange: (d: number) => void;
+}) => (
+  <View style={localStyles.formSection}>
+    <Text style={localStyles.formLabel}>Duration (min) *</Text>
+    <View style={localStyles.inputContainer}>
+      <TouchableOpacity
+        onPress={() => onChange(Math.max(0, duration - 30))}
+        style={localStyles.durationButton}
+      >
+        <Text>−</Text>
+      </TouchableOpacity>
+      <Text style={localStyles.durationValue}>{duration}</Text>
+      <TouchableOpacity
+        onPress={() => onChange(duration + 30)}
+        style={localStyles.durationButton}
+      >
+        <Text>+</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+const OptionSection = ({ section, selectedValue, onSelect }: any) => (
+  <View style={localStyles.formSection}>
+    <Text style={localStyles.formLabel}>{section.label} *</Text>
+    <View style={localStyles.optionContainer}>
+      {section.opts.map((opt: string) => (
+        <TouchableOpacity
+          key={opt}
+          onPress={() => onSelect(section.key, opt)}
+          style={[
+            localStyles.optionButton,
+            selectedValue === opt && localStyles.optionButtonSelected,
+          ]}
+        >
+          {section.key === "energy" && (
+            <Text style={localStyles.optionEmoji}>
+              {EMOJIS[opt as keyof typeof EMOJIS]}
+            </Text>
+          )}
+          <Text>{opt.charAt(0).toUpperCase() + opt.slice(1)}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+);
+
+const RatingSection = ({
+  quality,
+  onRate,
+}: {
+  quality: number;
+  onRate: (q: number) => void;
+}) => (
+  <View>
+    <Text style={localStyles.formLabel}>Quality *</Text>
+    <View style={localStyles.ratingContainer}>
+      {[1, 2, 3, 4, 5].map((s) => (
+        <TouchableOpacity
+          key={s}
+          onPress={() => onRate(s)}
+          style={[
+            localStyles.starButton,
+            quality >= s && localStyles.starButtonFilled,
+          ]}
+        >
+          <Text style={{color: 'yellow', fontSize: 25}}>★</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
   </View>
 );
 
@@ -45,135 +131,64 @@ const LogDetailModal = ({
 
   if (!item) return null;
 
-  // Simplified debug - check user's logs subcollection
-
   const handleSave = async () => {
-  if (!item.id)
-    return Alert.alert("Error", "Document ID is missing. Cannot update.");
-  if (!form.energy || !form.quality || !form.outcome)
-    return Alert.alert("Required", "Please fill all fields.");
-
-  setLoading(true);
-  try {
-    console.log("Attempting update...");
-    console.log("User UID:", auth.currentUser?.uid);
-    console.log("Document ID:", item.id.trim());
-    
-    const logRef = doc(db, "dailyLogs", item.id.trim());
-    
-    // Don't check if document exists - just try to update directly
-    await updateDoc(logRef, {
-      outcome: form.outcome,
-      actualDuration: form.duration,
-      energy: form.energy,
-      completionQuality: form.quality,
-      completedAt: new Date().toISOString(),
-    });
-
-    console.log("✓ Update successful!");
-    Alert.alert("Success", "Updated successfully!");
-    setIsForm(false);
-    onClose();
-    
-  } catch (e: any) {
-    console.error("Error code:", e.code);
-    console.error("Error message:", e.message);
-    
-    // If update fails, it might be a permission issue
-    if (e.code === "permission-denied") {
-      Alert.alert("Permission Error", "You don't have permission to update this document. Make sure you created it.");
-    } else if (e.code === "not-found") {
-      Alert.alert("Not Found", "The document doesn't exist. It may have been deleted.");
-    } else {
-      Alert.alert("Error", e.message);
+    if (!item.id || !form.energy || !form.quality || !form.outcome) {
+      return Alert.alert(
+        "Error",
+        form.energy ? "Please fill all fields." : "Document ID missing."
+      );
     }
-  } finally {
-    setLoading(false);
-  }
-};
+
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, "dailyLogs", item.id.trim()), {
+        outcome: form.outcome,
+        actualDuration: form.duration,
+        energy: form.energy,
+        completionQuality: form.quality,
+        completedAt: new Date().toISOString(),
+      });
+      Alert.alert("Success", "Updated successfully!");
+      setIsForm(false);
+      onClose();
+    } catch (e: any) {
+      Alert.alert(
+        "Error",
+        e.code === "permission-denied"
+          ? "Permission denied."
+          : e.code === "not-found"
+          ? "Document not found."
+          : e.message
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateForm = (key: string, value: any) =>
+    setForm((f) => ({ ...f, [key]: value }));
 
   if (isForm)
     return (
       <CustomModal visible={visible} onClose={onClose}>
         <ScrollView style={localStyles.modalContent}>
           <Text style={localStyles.modalTitle}>Complete Task</Text>
-          <View style={localStyles.formSection}>
-            <Text style={localStyles.formLabel}>Duration (min) *</Text>
-            <View style={localStyles.inputContainer}>
-              <TouchableOpacity
-                onPress={() =>
-                  setForm((f) => ({
-                    ...f,
-                    duration: Math.max(0, f.duration - 30),
-                  }))
-                }
-                style={localStyles.durationButton}
-              >
-                <Text>−</Text>
-              </TouchableOpacity>
-              <Text style={localStyles.durationValue}>{form.duration}</Text>
-              <TouchableOpacity
-                onPress={() =>
-                  setForm((f) => ({ ...f, duration: f.duration + 30 }))
-                }
-                style={localStyles.durationButton}
-              >
-                <Text>+</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {[
-            {
-              label: "Energy Level",
-              key: "energy",
-              opts: ["low", "medium", "high"],
-            },
-            {
-              label: "Outcome",
-              key: "outcome",
-              opts: ["completed", "partial", "missed"],
-            },
-          ].map((sec) => (
-            <View key={sec.key} style={localStyles.formSection}>
-              <Text style={localStyles.formLabel}>{sec.label} *</Text>
-              <View style={localStyles.optionContainer}>
-                {sec.opts.map((opt) => (
-                  <TouchableOpacity
-                    key={opt}
-                    onPress={() => setForm((f) => ({ ...f, [sec.key]: opt }))}
-                    style={[
-                      localStyles.optionButton,
-                      form[sec.key as keyof typeof form] === opt &&
-                        localStyles.optionButtonSelected,
-                    ]}
-                  >
-                    {sec.key === "energy" && (
-                      <Text style={localStyles.optionEmoji}>{emojis[opt]}</Text>
-                    )}
-                    <Text>{opt.charAt(0).toUpperCase() + opt.slice(1)}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+          <DurationControl
+            duration={form.duration}
+            onChange={(d) => updateForm("duration", d)}
+          />
+          {FORM_SECTIONS.map((sec) => (
+            <OptionSection
+              key={sec.key}
+              section={sec}
+              selectedValue={form[sec.key as keyof typeof form]}
+              onSelect={(k: string, v: string) => updateForm(k, v)}
+            />
           ))}
-
-          <Text style={localStyles.formLabel}>Quality *</Text>
-          <View style={localStyles.ratingContainer}>
-            {[1, 2, 3, 4, 5].map((s) => (
-              <TouchableOpacity
-                key={s}
-                onPress={() => setForm((f) => ({ ...f, quality: s }))}
-                style={[
-                  localStyles.starButton,
-                  form.quality >= s && localStyles.starButtonFilled,
-                ]}
-              >
-                <Text>★</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
+          <RatingSection
+            quality={form.quality}
+            onRate={(q) => updateForm("quality", q)}
+          />
           <DefaultButton
             title="Cancel"
             onPress={() => setIsForm(false)}
@@ -204,12 +219,37 @@ const LogDetailModal = ({
         </View>
         <Text style={localStyles.modalTitle}>{item.intention}</Text>
         <View style={localStyles.metaContainer}>
-          <StatRow label="Planned" value={`${item.plannedDuration || 0} min`} />
+          <StatRow
+            label="Planned Duration"
+            value={`${item.plannedDuration || 0} min`}
+          />
           {item.actualDuration && (
             <StatRow label="Actual" value={`${item.actualDuration} min`} />
           )}
-          <StatRow label="Mood" value={emojis[item.mood as string] || "❓"} />
-          <StatRow label="Status" value={item.outcome || "Not Completed"} />
+          <StatRow
+            label="Mood"
+            value={EMOJIS[item.mood as keyof typeof EMOJIS] || "❓"}
+          />
+          <StatRow
+            label="Status"
+            value={
+              item.outcome === "completed"
+                ? "Completed"
+                : item.outcome === "partial"
+                ? "Partial Completed"
+                : item.outcome === "missed"
+                ? "Missed"
+                : "In Progress"
+            }
+          />
+          {item.energy && (
+            <StatRow label="Energy" value={item.energy || "Not Completed"} />
+          )}
+          <StatRow
+            label="Difficulty"
+            value={item.difficulty || "Not Completed"}
+          />
+          <StatRow label="Notes" value={item.notes || "Not Provided"} />
         </View>
         {!item.outcome && (
           <DefaultButton
@@ -218,6 +258,7 @@ const LogDetailModal = ({
             style={{ marginBottom: 10, backgroundColor: "#10b981" }}
           />
         )}
+
         <DefaultButton
           title="Close"
           onPress={onClose}
