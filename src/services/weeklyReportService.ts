@@ -1,308 +1,188 @@
 import {
-  Timestamp,
   collection,
   doc,
   getDoc,
   getDocs,
-  limit,
   orderBy,
   query,
   setDoc,
+  Timestamp,
   updateDoc,
-  where,
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { DailyLog } from '../schemas/dailyLogsSchema';
-import { User } from '../schemas/userSchema';
-import { WeeklyReports } from '../schemas/weeklyReportsSchema';
-import { calculateCompletionScore } from '../utils/calculations/completionScore';
-import { calculateDifficultyScore } from '../utils/calculations/difficultyScore';
-import { calculateEffortScore } from '../utils/calculations/effortScore';
-import { calculateQualityScore } from '../utils/calculations/qualityScore';
-import { generateInsights } from '../utils/insights/insightsGenerator';
-import { generateRecommendation } from '../utils/insights/recommendation';
+  where
+} from "firebase/firestore";
+import { db } from "../config/firebase";
+import { DailyLog } from "../schemas/dailyLogsSchema";
+import { WeeklyReports } from "../schemas/weeklyReportsSchema";
+import { calculateCompletionScore } from "../utils/calculations/completionScore";
+import { calculateEffortScore } from "../utils/calculations/effortScore";
+import { calculateQualityScore } from "../utils/calculations/qualityScore";
+import { moveLogsToHistory } from "./logsToHistory";
 
-
-export interface ScoreBreakdown {
-  completion: number;
-  effort: number;
-  quality: number;
-  difficulty: number;
-  total: number;
-}
-
-/**
- * Fetch daily logs for a specific cycle
- */
-async function fetchLogsForCycle(
+export async function weeklyReportService(
   userId: string,
-  cycleStart: Date,
-  cycleEnd: Date
-): Promise<DailyLog[]> {
+  isManualTrigger: boolean = false
+) {
+  console.log("🔄 Weekly report generation requested for:", userId);
+  console.log("📍 Trigger type:", isManualTrigger ? "Manual" : "Automatic");
+
   try {
-    // Force dates to start/end of day to ensure no logs are missed
-    const start = new Date(cycleStart);
-    start.setHours(0, 0, 0, 0);
+    // Get user data
+    console.log("📝 Fetching user data...");
+    const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
     
-    const end = new Date(cycleEnd);
-    end.setHours(23, 59, 59, 999);
+    if (!userSnap.exists()) {
+      throw new Error("User not found");
+    }
 
-    const startDateStr = start.toISOString().split('T')[0];
-    const endDateStr = end.toISOString().split('T')[0];
+    const userData = userSnap.data();
+    const currentCycleStart: Timestamp = userData.currentCycleStart;
+    const cyclesCompleted: number = userData.cyclesCompleted || 0;
 
-    const logsQuery = query(
-      collection(db, 'dailyLogs'),
-      where('userId', '==', userId),
-      where('date', '>=', startDateStr),
-      where('date', '<=', endDateStr),
-      orderBy('date', 'desc')
+    console.log("👤 User Info:");
+    console.log(`  - Cycles completed: ${cyclesCompleted}`);
+    console.log(`  - Current cycle start: ${currentCycleStart.toDate().toISOString()}`);
+
+    // Fetch ALL logs for this user
+    console.log("📦 Fetching all logs...");
+    const logsRef = collection(db, "dailyLogs");
+    const allLogsQuery = query(
+      logsRef,
+      where("userId", "==", userId),
+      orderBy("createdAt", "asc")
     );
 
-    const logsSnapshot = await getDocs(logsQuery);
-    return logsSnapshot.docs.map((doc) => doc.data() as DailyLog);
-  } catch (error) {
-    console.error('Error fetching logs for cycle:', error);
-    throw error;
-  }
-}
+    const allLogsSnap = await getDocs(allLogsQuery);
+    console.log(`📊 Total logs found: ${allLogsSnap.size}`);
 
-/**
- * Fetch user data by UID (direct document access)
- */
-async function fetchUser(userId: string): Promise<User | null> {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const userSnapshot = await getDoc(userRef);
-
-    if (!userSnapshot.exists()) {
-      console.warn('User not found:', userId);
-      return null;
+    if (allLogsSnap.size < 7) {
+      console.log(`❌ Not enough logs: ${allLogsSnap.size}/7`);
+      return {
+        success: false,
+        requiresSubscription: false,
+        message: `Not enough logs. You have ${allLogsSnap.size}/7 logs. Complete ${7 - allLogsSnap.size} more logs first.`,
+        weeklyReport: null,
+      };
     }
 
-    const user = userSnapshot.data() as User;
-    return user;
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    throw error;
-  }
-}
+    // Convert to DailyLog array
+    console.log("🔄 Converting logs to DailyLog objects...");
+    const cycleLogs: DailyLog[] = allLogsSnap.docs.map((doc) => ({
+      id: doc.id,
+      userId: doc.data().userId,
+      date: doc.data().date,
+      intention: doc.data().intention,
+      plannedDuration: doc.data().plannedDuration,
+      actualDuration: doc.data().actualDuration ?? null,
+      outcome: doc.data().outcome ?? null,
+      completionQuality: doc.data().completionQuality ?? null,
+      difficulty: doc.data().difficulty ?? null,
+      mood: doc.data().mood ?? null,
+      energy: doc.data().energy ?? null,
+      notes: doc.data().notes ?? null,
+      createdAt: doc.data().createdAt,
+    }));
 
-/**
- * Calculate all scores
- */
-function calculateScores(logs: DailyLog[]): ScoreBreakdown {
-  const completion = calculateCompletionScore(logs);
-  const effort = calculateEffortScore(logs);
-  const quality = calculateQualityScore(logs);
-  const difficulty = calculateDifficultyScore(logs);
-  const total = completion + effort + quality + difficulty;
+    console.log("✅ Logs ready, starting score calculation...");
 
-  return {
-    completion,
-    effort,
-    quality,
-    difficulty,
-    total,
-  };
-}
+    // Calculate cycle end
+    const cycleEnd = Timestamp.now();
 
-/**
- * Determine consistency level based on completion score
- */
-function determineConsistencyLevel(
-  completionScore: number
-): 'low' | 'medium' | 'high' {
-  if (completionScore >= 50) {
-    return 'high';
-  } else if (completionScore >= 30) {
-    return 'medium';
-  } else {
-    return 'low';
-  }
-}
+    // Calculate scores
+    console.log("🧮 Calculating scores...");
+    const completionScore = calculateCompletionScore(cycleLogs);
+    const effortScore = calculateEffortScore(cycleLogs);
+    const qualityScore = calculateQualityScore(cycleLogs);
 
-/**
- * Save weekly report to Firestore
- */
-async function saveWeeklyReport(
-  userId: string,
-  cycleStart: Timestamp,
-  report: WeeklyReports
-): Promise<void> {
-  try {
-    const reportId = cycleStart.toDate().toISOString().split('T')[0];
-    const reportRef = doc(db, 'users', userId, 'weeklyReports', reportId);
-
-    await setDoc(reportRef, report);
-    console.log('Weekly report saved:', reportId);
-  } catch (error) {
-    console.error('Error saving weekly report:', error);
-    throw error;
-  }
-}
-
-/**
- * Update user's current score and last report timestamp
- */
-async function updateUserStats(
-  userId: string,
-  weeklyScore: number
-): Promise<void> {
-  try {
-    const userRef = doc(db, 'users', userId);
-
-    await updateDoc(userRef, {
-      currentScore: weeklyScore,
-      lastReportAt: Timestamp.now(),
-    });
-
-    console.log('User stats updated:', {
-      userId,
-      currentScore: weeklyScore,
-    });
-  } catch (error) {
-    console.error('Error updating user stats:', error);
-    throw error;
-  }
-}
-
-/**
- * Main function: Generate weekly report for a user
- */
-export async function generateWeeklyReport(userId: string): Promise<WeeklyReports | null> {
-  try {
-    console.log('Starting weekly report generation for user:', userId);
-
-    const user = await fetchUser(userId);
-    if (!user) {
-      console.error('User not found');
-      return null;
-    }
-
-    const cycleStart = user.currentCycleStart;
-    const cycleStartDate = new Date(cycleStart.seconds * 1000);
-    const cycleEndDate = new Date(
-      cycleStartDate.getTime() + 7 * 24 * 60 * 60 * 1000
+    const energyMap: Record<string, number> = { low: 0, medium: 5, high: 10 };
+    const energyScore = Math.round(
+      cycleLogs.reduce((sum, log) => sum + (log.energy ? energyMap[log.energy] : 0), 0) / 7
     );
-    const cycleEnd = Timestamp.fromDate(cycleEndDate);
 
-    console.log('Cycle dates:', {
-      start: cycleStartDate.toISOString().split('T')[0],
-      end: cycleEndDate.toISOString().split('T')[0],
+    let difficultyScore = 0;
+    cycleLogs.forEach((log) => {
+      if (log.difficulty === "hard" && log.outcome === "completed") difficultyScore += 1;
+      if (log.difficulty === "easy" && log.outcome === "missed") difficultyScore -= 1;
     });
+    difficultyScore = Math.max(0, Math.min(difficultyScore, 10));
 
-    const logs = await fetchLogsForCycle(userId, cycleStartDate, cycleEndDate);
+    const weeklyScore = completionScore + effortScore + qualityScore + energyScore + difficultyScore;
 
-    if (logs.length === 0) {
-      console.warn('No daily logs found for this cycle');
-      return null;
-    }
+    console.log(`📊 Weekly score calculated: ${weeklyScore}/100`);
 
-    const scores = calculateScores(logs);
-    console.log('Calculated scores:', scores);
+    const consistencyLevel: "low" | "medium" | "high" =
+      cycleLogs.length === 7 ? "high" : cycleLogs.length >= 5 ? "medium" : "low";
 
-    const aiInsights = generateInsights(logs, scores);
-    const recommendation = generateRecommendation(scores);
-    const consistencyLevel = determineConsistencyLevel(scores.completion);
+    const completedCount = cycleLogs.filter(l => l.outcome === "completed").length;
+    const aiInsights: string[] = [
+      `You completed ${completedCount}/7 tasks this cycle.`,
+      cycleLogs.length === 7 ? "Perfect consistency this week!" : "Try to maintain daily logging for better insights."
+    ];
+    
+    const recommendation: string =
+      weeklyScore >= 80
+        ? "Excellent work! Keep up your effort and focus on completing harder tasks."
+        : weeklyScore >= 60
+        ? "Good progress! Try to increase task completion and quality."
+        : "Focus on consistency and completing planned tasks.";
 
     const weeklyReport: WeeklyReports = {
       userId,
-      cycleStart,
+      cycleStart: currentCycleStart,
       cycleEnd,
-      weeklyScore: Math.round(scores.total),
+      weeklyScore,
       consistencyLevel,
       breakdown: {
-        completion: scores.completion,
-        effort: scores.effort,
-        quality: scores.quality,
-        difficulty: scores.difficulty,
+        completion: completionScore,
+        effort: effortScore,
+        quality: qualityScore,
+        difficulty: difficultyScore,
       },
       aiInsights,
       recommendation,
       generatedAt: Timestamp.now(),
     };
 
-    console.log('Generated weekly report:', weeklyReport);
+    // Save report
+    console.log("💾 Saving weekly report...");
+    const reportId = `${userId}_${currentCycleStart.toMillis()}`;
+    await setDoc(doc(db, "weeklyReports", reportId), weeklyReport);
+    console.log("✅ Report saved");
 
-    await saveWeeklyReport(userId, cycleStart, weeklyReport);
-    await updateUserStats(userId, weeklyReport.weeklyScore);
+    // Move logs to history
+    console.log("📦 Moving logs to history...");
+    await moveLogsToHistory(userId, cycleLogs, currentCycleStart);
+    console.log("✅ Logs moved to history");
 
-    console.log('Weekly report generation completed successfully');
+    // Update user cycle
+    console.log("🔄 Updating user cycle...");
+    const nextCycleStart = Timestamp.now();
+    await updateDoc(userRef, {
+      currentCycleStart: nextCycleStart,
+      lastReportAt: Timestamp.now(),
+      currentScore: weeklyScore,
+      cyclesCompleted: cyclesCompleted + 1,
+      cycleReadyForReport: false,
+    });
+    console.log("✅ User cycle updated");
 
-    return weeklyReport;
-  } catch (error) {
-    console.error('Error generating weekly report:', error);
-    return null;
+    console.log("🎉 Report generation complete!");
+    
+    return {
+      success: true,
+      requiresSubscription: false,
+      weeklyReport,
+      message: "Weekly report generated successfully!",
+    };
+
+  } catch (error: any) {
+    console.error("❌ Error in weekly report generation:", error);
+    console.error("❌ Stack:", error.stack);
+    return {
+      success: false,
+      requiresSubscription: false,
+      weeklyReport: null,
+      message: `Error: ${error.message}`,
+    };
   }
-}
-
-/**
- * Fetch the latest weekly report for a user
- */
-export async function getLatestWeeklyReport(
-  userId: string
-): Promise<WeeklyReports | null> {
-  try {
-    const reportsQuery = query(
-      collection(db, 'users', userId, 'weeklyReports'),
-      orderBy('generatedAt', 'desc'),
-      limit(1)
-    );
-
-    const reportsSnapshot = await getDocs(reportsQuery);
-
-    if (reportsSnapshot.empty) {
-      console.warn('No weekly reports found for user:', userId);
-      return null;
-    }
-
-    const report = reportsSnapshot.docs[0].data() as WeeklyReports;
-    return report;
-  } catch (error) {
-    console.error('Error fetching latest weekly report:', error);
-    return null;
-  }
-}
-
-/**
- * Fetch all weekly reports for a user
- */
-export async function getAllWeeklyReports(
-  userId: string,
-  limitCount: number = 10
-): Promise<WeeklyReports[]> {
-  try {
-    const reportsQuery = query(
-      collection(db, 'users', userId, 'weeklyReports'),
-      orderBy('generatedAt', 'desc'),
-      limit(limitCount)
-    );
-
-    const reportsSnapshot = await getDocs(reportsQuery);
-    const reports = reportsSnapshot.docs.map((doc) => doc.data() as WeeklyReports);
-
-    console.log(`Fetched ${reports.length} weekly reports for user:`, userId);
-
-    return reports;
-  } catch (error) {
-    console.error('Error fetching weekly reports:', error);
-    return [];
-  }
-}
-
-/**
- * Utility function to format report for display
- */
-export function formatReportForDisplay(report: WeeklyReports) {
-  return {
-    weeklyScore: `${report.weeklyScore}/100`,
-    consistencyLevel: report.consistencyLevel.toUpperCase(),
-    completion: `${report.breakdown.completion}/60`,
-    effort: `${report.breakdown.effort}/20`,
-    quality: `${report.breakdown.quality}/10`,
-    difficulty: `${report.breakdown.difficulty}/10`,
-    insights: report.aiInsights,
-    recommendation: report.recommendation,
-    generatedAt: new Date(report.generatedAt.seconds * 1000).toLocaleDateString(),
-  };
 }

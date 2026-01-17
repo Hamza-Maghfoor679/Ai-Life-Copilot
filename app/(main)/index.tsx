@@ -64,7 +64,7 @@ const MainIndex = () => {
       }
     );
 
-    return () => unsubscribe(); // Cleanup listener
+    return () => unsubscribe();
   }, [user?.uid, dispatch]);
 
   const handleOpenModal = () => setIsOpen(true);
@@ -88,7 +88,7 @@ const handleSetIntention = async () => {
 
   const dailyLog = cleanUndefined({
     id: logRef.id,
-    userId: auth.currentUser.uid,  // Now it's guaranteed to be a string
+    userId: auth.currentUser.uid,
     date: new Date().toISOString().split("T")[0],
     intention,
     plannedDuration: plannedDuration * 60,
@@ -162,7 +162,7 @@ const handleSetIntention = async () => {
               />
 
               <View style={styles.moodTrackerContainer}>
-                <Text style={styles.moodTrackerText}>Mood Tracker</Text>
+                <Text style={styles.moodTrackerText}>How are you feeling today?</Text>
                 <View style={styles.moodRow}>
                   {["😃", "😐", "😔", "😡", "😓"].map((emoji, index) => (
                     <TouchableOpacity
