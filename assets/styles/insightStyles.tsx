@@ -20,11 +20,11 @@ export const styles = StyleSheet.create({
   },
   // --- Modal Specific Styles ---
   modalContent: {
-    padding: 10,
+    paddingVertical: 10,
     alignItems: "center",
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     color: "#234C6A",
     textAlign: "center",
@@ -60,8 +60,14 @@ export const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalDescription: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#334155",
     lineHeight: 24,
+  },
+  recommendation: {
+    fontSize: 15,
+    color: "#07ac28",
+    lineHeight: 24,
+    textAlign: 'center'
   },
 });

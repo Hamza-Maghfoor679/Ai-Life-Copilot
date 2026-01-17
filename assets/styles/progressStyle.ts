@@ -167,7 +167,7 @@ export const localStyles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 8,
-    backgroundColor: "#6366F1",
+    backgroundColor: "#1F2937",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -192,21 +192,21 @@ export const localStyles = StyleSheet.create({
   },
   optionButton: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     borderRadius: 12,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: "#5e6d8a",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#FFFFFF",
   },
   optionButtonSelected: {
-    backgroundColor: "#46cda0",
-    borderColor: "#10B981",
+    backgroundColor: "#1F2937",
+    borderColor: "#ddfff4",
   },
   optionEmoji: {
-    fontSize: 28,
+    fontSize: 20,
     marginBottom: 6,
   },
   optionLabel: {
@@ -221,9 +221,10 @@ export const localStyles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
     justifyContent: "center",
+    flexWrap: 'wrap'
   },
   starButton: {
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 8,
     backgroundColor: "#b7c1d7",
@@ -232,12 +233,12 @@ export const localStyles = StyleSheet.create({
     flexWrap: 'wrap'
   },
   starButtonFilled: {
-    backgroundColor: "#bfd2ae",
+    backgroundColor: "#1F2937",
     borderColor: "#000000",
   },
   star: {
     fontSize: 24,
-    color: "#fbff8c",
+    color: "#f9ff4f",
   },
   qualityText: {
     fontSize: 13,
@@ -246,8 +247,6 @@ export const localStyles = StyleSheet.create({
     marginTop: 10,
     fontWeight: "500",
   },
-
- 
 
   // Button Container
   buttonContainer: {

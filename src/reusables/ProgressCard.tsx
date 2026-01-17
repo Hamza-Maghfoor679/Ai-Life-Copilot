@@ -64,17 +64,18 @@ export default ProgressCard;
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: "#2f63a6",
-    padding: 16,
+    padding: 14,
     borderRadius: 12,
     marginVertical: 8,
     backgroundColor: "#fff",
     shadowColor: "#000",
     shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 10, height: 2 },
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 15,
+    borderLeftWidth: 5,
   },
   header: {
     flexDirection: "row",
@@ -92,17 +93,17 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 12,
     flexShrink: 0,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
   },
   description: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#475569",
     lineHeight: 20,
   },

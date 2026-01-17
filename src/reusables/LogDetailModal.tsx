@@ -1,10 +1,11 @@
-import { Log } from "@/app/types/utils";
 import { localStyles } from "@/assets/styles/progressStyle";
 import { db } from "@/src/config/firebase";
 import CustomModal from "@/src/reusables/Modal";
+import { FontAwesome } from "@expo/vector-icons";
 import { doc, updateDoc } from "firebase/firestore";
 import React, { useState } from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { DailyLog } from "../schemas/dailyLogsSchema";
 import DefaultButton from "./Button";
 
 const EMOJIS = {
@@ -47,14 +48,14 @@ const DurationControl = ({
         onPress={() => onChange(Math.max(0, duration - 30))}
         style={localStyles.durationButton}
       >
-        <Text>−</Text>
+        <FontAwesome name="minus-circle" size={20} color={"white"} />
       </TouchableOpacity>
       <Text style={localStyles.durationValue}>{duration}</Text>
       <TouchableOpacity
         onPress={() => onChange(duration + 30)}
         style={localStyles.durationButton}
       >
-        <Text>+</Text>
+        <FontAwesome name="plus-circle" size={20} color={"white"} />
       </TouchableOpacity>
     </View>
   </View>
@@ -78,7 +79,9 @@ const OptionSection = ({ section, selectedValue, onSelect }: any) => (
               {EMOJIS[opt as keyof typeof EMOJIS]}
             </Text>
           )}
-          <Text>{opt.charAt(0).toUpperCase() + opt.slice(1)}</Text>
+          <Text style={selectedValue === opt && { color: "white" }}>
+            {opt.charAt(0).toUpperCase() + opt.slice(1)}
+          </Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -104,7 +107,7 @@ const RatingSection = ({
             quality >= s && localStyles.starButtonFilled,
           ]}
         >
-          <Text style={{color: 'yellow', fontSize: 25}}>★</Text>
+          <Text style={{ color: "#ffff00", fontSize: 25 }}>★</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -117,7 +120,7 @@ const LogDetailModal = ({
   onClose,
 }: {
   visible: boolean;
-  item: Log | null;
+  item: DailyLog | null;
   onClose: () => void;
 }) => {
   const [loading, setLoading] = useState(false);
@@ -197,8 +200,8 @@ const LogDetailModal = ({
           <DefaultButton
             title={loading ? "Saving..." : "Save & Complete"}
             onPress={handleSave}
-            style={{ backgroundColor: "#10b981" }}
             disabled={loading}
+            backgroundColor="#1F2937"
           />
         </ScrollView>
       </CustomModal>

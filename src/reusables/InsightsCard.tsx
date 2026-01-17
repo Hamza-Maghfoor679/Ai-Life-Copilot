@@ -23,21 +23,15 @@ const InsightsCard = ({
     Completed: "#10b981",
     "In Progress": "#3b82f6",
   };
-
-  const statusIcons: Record<string, any> = {
-    Completed: "checkmark-circle",
-    Pending: "time",
-    "In Progress": "hourglass",
-  };
-
   return (
     <TouchableOpacity style={[styles.card, styles.aiCard]} onPress={onPress}>
       {/* Indicator dot */}
-      <View style={styles.indicator} />
+      
 
       <View style={styles.textContainer}>
         <View style={styles.titleRow}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
+          <Text style={styles.cardTitle} numberOfLines={2}>{title}</Text>
+          <Ionicons name="sparkles" size={15} style={{marginHorizontal: 2}} />
           {status && (
             <View
               style={[
@@ -45,12 +39,6 @@ const InsightsCard = ({
                 { backgroundColor: statusColors[status] || "#ccc" },
               ]}
             >
-              <Ionicons
-                name='sparkles'
-                size={13}
-                color="#fff"
-                style={{ marginRight: 4 }}
-              />
               <Text style={styles.statusText}>{status}</Text>
             </View>
           )}
@@ -75,18 +63,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     shadowColor: "#000",
     shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 3,
     flexDirection: "row",
     alignItems: "flex-start",
     borderWidth: 1.5,
     borderColor: "#e2e8f0",
     minHeight: 100,
-  },
-  aiCard: {
     borderLeftWidth: 5,
     borderLeftColor: "#234C6A",
+  },
+  aiCard: {
     backgroundColor: "#f8faff",
   },
   indicator: {

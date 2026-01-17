@@ -3,6 +3,7 @@ import { auth, db } from "@/src/config/firebase";
 import Header from "@/src/reusables/Header";
 import LogDetailModal from "@/src/reusables/LogDetailModal";
 import ProgressCard from "@/src/reusables/ProgressCard";
+import { DailyLog } from "@/src/schemas/dailyLogsSchema";
 import { weeklyReportService } from "@/src/services/weeklyReportService";
 import { router } from "expo-router";
 import {
@@ -22,7 +23,6 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { Log } from "../types/utils";
 
 type StatusType =
   | "Completed"
@@ -32,9 +32,9 @@ type StatusType =
   | undefined;
 
 const Progress = () => {
-  const [logs, setLogs] = useState<Log[]>([]);
+  const [logs, setLogs] = useState<DailyLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedItem, setSelectedItem] = useState<Log | null>(null);
+  const [selectedItem, setSelectedItem] = useState<DailyLog | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [cycleReadyForReport, setCycleReadyForReport] = useState(false);
   const [cyclesCompleted, setCyclesCompleted] = useState(0);
@@ -139,7 +139,7 @@ const Progress = () => {
             });
           });
 
-          const fetchedLogs = Array.from(uniqueDataMap.values()) as Log[];
+          const fetchedLogs = Array.from(uniqueDataMap.values()) as DailyLog[];
 
           fetchedLogs.sort((a, b) => {
             const timeA =
