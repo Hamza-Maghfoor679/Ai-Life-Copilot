@@ -17,6 +17,7 @@ import { calculateCompletionScore } from "../utils/calculations/completionScore"
 import { calculateEffortScore } from "../utils/calculations/effortScore";
 import { calculateQualityScore } from "../utils/calculations/qualityScore";
 import { moveLogsToHistory } from "./logsToHistory";
+import { aiInsightsGeneration } from "./openaiService";
 
 export async function weeklyReportService(
   userId: string,
@@ -108,23 +109,29 @@ export async function weeklyReportService(
 
     const weeklyScore = completionScore + effortScore + qualityScore + energyScore + difficultyScore;
 
-    console.log(`📊 Weekly score calculated: ${weeklyScore}/100`);
-
     const consistencyLevel: "low" | "medium" | "high" =
-      cycleLogs.length === 7 ? "high" : cycleLogs.length >= 5 ? "medium" : "low";
+      cycleLogs.length === 7
+        ? "high"
+        : cycleLogs.length >= 5
+        ? "medium"
+        : "low";
 
-    const completedCount = cycleLogs.filter(l => l.outcome === "completed").length;
-    const aiInsights: string[] = [
-      `You completed ${completedCount}/7 tasks this cycle.`,
-      cycleLogs.length === 7 ? "Perfect consistency this week!" : "Try to maintain daily logging for better insights."
-    ];
-    
-    const recommendation: string =
-      weeklyScore >= 80
-        ? "Excellent work! Keep up your effort and focus on completing harder tasks."
-        : weeklyScore >= 60
-        ? "Good progress! Try to increase task completion and quality."
-        : "Focus on consistency and completing planned tasks.";
+    // ✨ Generate AI insights ✨
+    console.log("🤖 Generating AI insights...");
+    const aiResponse = await aiInsightsGeneration(
+      userId,
+      cycleLogs,
+      weeklyScore,
+      completionScore,
+      effortScore,
+      qualityScore,
+      energyScore,
+      difficultyScore
+    );
+
+    console.log("✅ AI Response received:");
+    console.log("  - Insights:", aiResponse.insights);
+    console.log("  - Recommendation:", aiResponse.recommendation);
 
     const weeklyReport: WeeklyReports = {
       userId,
@@ -138,8 +145,8 @@ export async function weeklyReportService(
         quality: qualityScore,
         difficulty: difficultyScore,
       },
-      aiInsights,
-      recommendation,
+      aiInsights: aiResponse.insights, // ✨ AI-generated
+      recommendation: aiResponse.recommendation, // ✨ AI-generated
       generatedAt: Timestamp.now(),
     };
 

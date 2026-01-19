@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { ReactNode } from "react";
 import {
   Modal,
@@ -34,7 +35,18 @@ const CustomModal = ({
         />
 
         {/* Modal content */}
-        <View style={styles.content}>{children}</View>
+        <View style={styles.content}>
+          {/* Close Icon */}
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={24} color="#334155" />
+          </TouchableOpacity>
+
+          {children}
+        </View>
       </View>
     </Modal>
   );
@@ -56,5 +68,12 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 10,
     borderWidth: 2,
+    position: "relative",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 10,
   },
 });

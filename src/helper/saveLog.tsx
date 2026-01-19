@@ -13,6 +13,7 @@ import {
 import { db } from "../config/firebase";
 import { DailyLog } from "../schemas/dailyLogsSchema";
 import { weeklyReportService } from "../services/weeklyReportService";
+import { scheduleTaskReminder } from '../utils/notifications/notifications';
 
 /**
  * Create a daily log.
@@ -62,7 +63,9 @@ export const createDailyLog = async (log: DailyLog) => {
       createdAt: doc.data().createdAt,
     }));
 
-    console.log(`📊 Current cycle has ${existingCycleLogs.length} logs before adding new one`);
+    console.log(
+      `📊 Current cycle has ${existingCycleLogs.length} logs before adding new one`
+    );
 
     // 4️⃣ Check if adding this log would exceed 7 logs
     if (existingCycleLogs.length >= 7) {
@@ -75,7 +78,16 @@ export const createDailyLog = async (log: DailyLog) => {
     const docRef = doc(db, "dailyLogs", log.id);
     await setDoc(docRef, log);
     console.log("✓ Daily log saved:", log.id);
-
+    try {
+      await scheduleTaskReminder(log.id, log.intention, 7200);
+      console.log('Notifications set successfully')
+    } catch (notifError) {
+      console.warn(
+        "Log saved but notification failed to schedule:",
+        notifError
+      );
+      // We don't throw an error here because the log was already saved successfully
+    }
     // 6️⃣ Check if cycle is NOW complete (exactly 7 logs)
     const totalLogs = existingCycleLogs.length + 1;
     console.log(`📊 After adding new log: ${totalLogs} total logs`);
@@ -85,23 +97,26 @@ export const createDailyLog = async (log: DailyLog) => {
 
       // FREEMIUM LOGIC: Only auto-generate for first cycle or premium users
       const isFirstCycle = cyclesCompleted === 0;
-      const isPremium = subscriptionStatus === "premium" || subscriptionStatus === "trial";
+      const isPremium =
+        subscriptionStatus === "premium" || subscriptionStatus === "trial";
 
       if (isFirstCycle || isPremium) {
         console.log("✅ Auto-generating report (first cycle or premium user)");
-        
+
         try {
           // Auto-generate report (isManualTrigger = false)
           const result = await weeklyReportService(log.userId, false);
 
           if (result.success) {
             console.log("✅ Cycle completed successfully!");
-            console.log(`  - Report generated: ${result.weeklyReport?.weeklyScore} points`);
+            console.log(
+              `  - Report generated: ${result.weeklyReport?.weeklyScore} points`
+            );
             console.log(`  - Logs moved to history`);
             console.log(`  - New cycle started`);
 
-            return { 
-              ...log, 
+            return {
+              ...log,
               id: docRef.id,
               cycleCompleted: true,
               reportGenerated: true,
@@ -111,21 +126,26 @@ export const createDailyLog = async (log: DailyLog) => {
             throw new Error(result.message);
           }
         } catch (cycleError: any) {
-          console.error("❌ Error during cycle completion:", cycleError.message);
+          console.error(
+            "❌ Error during cycle completion:",
+            cycleError.message
+          );
           throw new Error(
             `Log saved but cycle completion failed: ${cycleError.message}`
           );
         }
       } else {
-        console.log("⏸️ 7 logs completed - waiting for manual report generation (premium feature)");
-        
+        console.log(
+          "⏸️ 7 logs completed - waiting for manual report generation (premium feature)"
+        );
+
         // Mark that cycle is ready for report but don't auto-generate
         await updateDoc(userRef, {
           cycleReadyForReport: true, // Flag for UI to show "Generate Report" button
         });
 
-        return { 
-          ...log, 
+        return {
+          ...log,
           id: docRef.id,
           cycleCompleted: true,
           reportGenerated: false,
@@ -137,7 +157,6 @@ export const createDailyLog = async (log: DailyLog) => {
       console.log(`⏳ Cycle in progress: ${totalLogs}/7 logs`);
       return { ...log, id: docRef.id };
     }
-
   } catch (error: any) {
     console.error("✗ Error creating daily log:", error.message);
     throw error;

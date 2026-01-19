@@ -67,7 +67,8 @@ export const styles = StyleSheet.create({
   recommendation: {
     fontSize: 15,
     color: "#07ac28",
-    lineHeight: 24,
-    textAlign: 'center'
+    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: 4
   },
 });

@@ -8,7 +8,9 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_ROUTER_APP_ROOT": "app"
+        "EXPO_ROUTER_APP_ROOT": "app",
+        "EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY": "$REVENUECAT_GOOGLE_KEY",
+        "EXPO_PUBLIC_VERCEL_API_URL": "https://ailifecopilot.vercel.app"
       },
       "android": {
         "buildType": "apk"
@@ -23,7 +25,9 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_ROUTER_APP_ROOT": "app"
+        "EXPO_ROUTER_APP_ROOT": "app",
+        "EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY": "$REVENUECAT_GOOGLE_KEY",
+        "EXPO_PUBLIC_VERCEL_API_URL": "https://ailifecopilot.vercel.app"
       }
     }
   },

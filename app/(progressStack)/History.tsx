@@ -1,9 +1,15 @@
 import { auth, db } from "@/src/config/firebase";
-import DefaultButton from "@/src/reusables/Button";
 import Header from "@/src/reusables/Header";
 import InsightsCard from "@/src/reusables/InsightsCard";
 import CustomModal from "@/src/reusables/Modal";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  startAfter,
+} from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -48,57 +54,75 @@ const History = () => {
   const [isCycleModalOpen, setIsCycleModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const PAGE_SIZE = 5;
+
+  const [lastDoc, setLastDoc] = useState<any>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  const fetchInitialHistory = async (userId: string) => {
+    setLoading(true);
+
+    const historyRef = collection(db, "historyLogs", userId, "cycles");
+
+    const q = query(
+      historyRef,
+      orderBy("archivedAt", "desc"),
+      limit(PAGE_SIZE)
+    );
+
+    const snapshot = await getDocs(q);
+
+    const data = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as HistoryCycle[];
+
+    setHistory(data);
+    setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+    setHasMore(snapshot.docs.length === PAGE_SIZE);
+    setLoading(false);
+  };
+
+  const fetchMoreHistory = async () => {
+    if (!hasMore || loadingMore || !lastDoc) return;
+    setLoadingMore(true);
+    const user = auth.currentUser;
+    if (!user) return;
+    const historyRef = collection(db, "historyLogs", user.uid, "cycles");
+    const q = query(
+      historyRef,
+      orderBy("archivedAt", "desc"),
+      startAfter(lastDoc),
+      limit(PAGE_SIZE)
+    );
+    const snapshot = await getDocs(q);
+
+    const data = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as HistoryCycle[];
+
+    setHistory((prev) => [...prev, ...data]);
+    setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+    setHasMore(snapshot.docs.length === PAGE_SIZE);
+    setLoadingMore(false);
+  };
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-
-    const authUnsub = auth.onAuthStateChanged((user) => {
-      // Clean up previous listener if user changes
-      if (unsubscribe) unsubscribe();
-
+    const unsub = auth.onAuthStateChanged((user) => {
       if (!user) {
         setHistory([]);
         setLoading(false);
         return;
       }
 
-      try {
-        // CORRECT PATH: historyLogs -> {userId} -> cycles
-        // Since we are pointing directly to the user's subcollection,
-        // we don't need a "where" clause for userId anymore.
-        const historyRef = collection(db, "historyLogs", user.uid, "cycles");
-
-        const q = query(historyRef, orderBy("archivedAt", "desc"));
-
-        unsubscribe = onSnapshot(
-          q,
-          (snapshot) => {
-            const fetchedHistory: HistoryCycle[] = snapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            })) as HistoryCycle[];
-
-            setHistory(fetchedHistory);
-            setLoading(false);
-          },
-          (error) => {
-            console.error("Firestore Listener Error:", error);
-            setLoading(false);
-          }
-        );
-      } catch (err) {
-        console.error("Setup Error:", err);
-        setLoading(false);
-      }
+      fetchInitialHistory(user.uid);
     });
 
-    return () => {
-      authUnsub();
-      if (unsubscribe) unsubscribe();
-    };
+    return () => unsub();
   }, []);
 
-  // --- Handlers ---
   const openCycleModal = (cycle: HistoryCycle) => {
     setSelectedCycle(cycle);
     setIsCycleModalOpen(true);
@@ -109,10 +133,7 @@ const History = () => {
     setIsLogModalOpen(true);
   };
 
-  // --- Render Items ---
   const renderCycleItem = ({ item }: { item: HistoryCycle }) => {
-    console.log("item>>>>>>>>>", item);
-    // Helper to handle potential null/undefined timestamps safely
     const formatDate = (ts: any) =>
       ts?.toDate?.() ? ts.toDate().toLocaleDateString() : "N/A";
     const formatTime = (ts: any) =>
@@ -158,11 +179,15 @@ const History = () => {
             renderItem={renderCycleItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingBottom: 20 }}
+            onEndReached={fetchMoreHistory}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              loadingMore ? <ActivityIndicator size="small" /> : null
+            }
           />
         )}
       </View>
 
-      {/* Cycle Modal: Shows list of logs within that cycle */}
       <CustomModal
         visible={isCycleModalOpen}
         onClose={() => setIsCycleModalOpen(false)}
@@ -178,19 +203,12 @@ const History = () => {
               data={selectedCycle.logs}
               renderItem={renderLogItem}
               keyExtractor={(item, index) => item.id || index.toString()}
-              style={{ maxHeight: 400 }} // Prevent modal from overflowing screen
-            />
-
-            <DefaultButton
-              title="Back"
-              onPress={() => setIsCycleModalOpen(false)}
-              style={{ marginTop: 15 }}
+              style={{ maxHeight: 400 }}
             />
           </View>
         )}
       </CustomModal>
 
-      {/* Individual Log Modal: Detailed view of a single log */}
       <CustomModal
         visible={isLogModalOpen}
         onClose={() => setIsLogModalOpen(false)}
@@ -202,7 +220,7 @@ const History = () => {
               <Text style={styles.label}>Mood:</Text>
               <Text style={styles.value}>{selectedLog.mood}</Text>
             </View>
-            
+
             <View style={styles.detailRow}>
               <Text style={styles.label}>Outcome:</Text>
               <Text style={styles.value}>
@@ -227,12 +245,6 @@ const History = () => {
                 <Text style={styles.value}>{selectedLog.energy}</Text>
               </View>
             )}
-
-            <DefaultButton
-              title="Close"
-              onPress={() => setIsLogModalOpen(false)}
-              style={{ marginTop: 20 }}
-            />
           </View>
         )}
       </CustomModal>

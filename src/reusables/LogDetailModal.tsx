@@ -6,6 +6,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import React, { useState } from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { DailyLog } from "../schemas/dailyLogsSchema";
+import { cancelTaskReminder } from "../utils/notifications/notifications";
 import DefaultButton from "./Button";
 
 const EMOJIS = {
@@ -154,6 +155,7 @@ const LogDetailModal = ({
       Alert.alert("Success", "Updated successfully!");
       setIsForm(false);
       onClose();
+      await cancelTaskReminder(item.id)
     } catch (e: any) {
       Alert.alert(
         "Error",
