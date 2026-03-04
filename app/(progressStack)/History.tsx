@@ -2,6 +2,7 @@ import { auth, db } from "@/src/config/firebase";
 import Header from "@/src/reusables/Header";
 import InsightsCard from "@/src/reusables/InsightsCard";
 import CustomModal from "@/src/reusables/Modal";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   collection,
   getDocs,
@@ -9,8 +10,9 @@ import {
   orderBy,
   query,
   startAfter,
+  Timestamp,
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +20,8 @@ import {
   Text,
   View,
 } from "react-native";
+
+const REPORTS_CACHE_KEY = "@history_cycles_cache";
 
 // --- Interfaces ---
 interface Log {
@@ -54,48 +58,143 @@ const History = () => {
   const [isCycleModalOpen, setIsCycleModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const PAGE_SIZE = 5;
 
+  const PAGE_SIZE = 5;
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  const fetchInitialHistory = async (userId: string) => {
-    setLoading(true);
+  // ---- Cache utilities ----
+  const saveHistoryToStorage = useCallback(async (cycles: HistoryCycle[]) => {
+    try {
+      const serializable = cycles.map((c) => ({
+        ...c,
+        cycleStart: c.cycleStart
+          ? {
+              _seconds: c.cycleStart.seconds,
+              _nanoseconds: c.cycleStart.nanoseconds,
+            }
+          : undefined,
+        cycleEnd: c.cycleEnd
+          ? {
+              _seconds: c.cycleEnd.seconds,
+              _nanoseconds: c.cycleEnd.nanoseconds,
+            }
+          : undefined,
+        archivedAt: c.archivedAt
+          ? {
+              _seconds: c.archivedAt.seconds,
+              _nanoseconds: c.archivedAt.nanoseconds,
+            }
+          : undefined,
+      }));
+      await AsyncStorage.setItem(
+        REPORTS_CACHE_KEY,
+        JSON.stringify(serializable),
+      );
+    } catch (e) {
+      console.error("Error saving history cache", e);
+    }
+  }, []);
 
-    const historyRef = collection(db, "historyLogs", userId, "cycles");
+  const loadHistoryFromStorage = useCallback(async (): Promise<
+    HistoryCycle[]
+  > => {
+    try {
+      const json = await AsyncStorage.getItem(REPORTS_CACHE_KEY);
+      if (!json) return [];
 
-    const q = query(
-      historyRef,
-      orderBy("archivedAt", "desc"),
-      limit(PAGE_SIZE)
-    );
+      const raw: HistoryCycle[] = JSON.parse(json);
 
-    const snapshot = await getDocs(q);
+      // restore Timestamps
+      return raw.map((c) => ({
+        ...c,
+        cycleStart: c.cycleStart
+          ? new Timestamp(c.cycleStart._seconds, c.cycleStart._nanoseconds)
+          : undefined,
+        cycleEnd: c.cycleEnd
+          ? new Timestamp(c.cycleEnd._seconds, c.cycleEnd._nanoseconds)
+          : undefined,
+        archivedAt: c.archivedAt
+          ? new Timestamp(c.archivedAt._seconds, c.archivedAt._nanoseconds)
+          : undefined,
+      }));
+    } catch (e) {
+      console.error("Error loading history cache", e);
+      return [];
+    }
+  }, []);
 
-    const data = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as HistoryCycle[];
+  // ---- Firestore fetching ----
+  const fetchInitialHistory = useCallback(
+    async (userId: string, showLoading: boolean = true) => {
+      if (showLoading) setLoading(true);
 
-    setHistory(data);
-    setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-    setHasMore(snapshot.docs.length === PAGE_SIZE);
-    setLoading(false);
-  };
+      const historyRef = collection(db, "historyLogs", userId, "cycles");
+      const q = query(
+        historyRef,
+        orderBy("archivedAt", "desc"),
+        limit(PAGE_SIZE),
+      );
+
+      const snapshot = await getDocs(q);
+
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as HistoryCycle[];
+
+      // restore Timestamps
+      const restoredData = data.map((c) => ({
+        ...c,
+        cycleStart:
+          c.cycleStart instanceof Timestamp
+            ? c.cycleStart
+            : c.cycleStart
+              ? new Timestamp(c.cycleStart.seconds, c.cycleStart.nanoseconds)
+              : undefined,
+        cycleEnd:
+          c.cycleEnd instanceof Timestamp
+            ? c.cycleEnd
+            : c.cycleEnd
+              ? new Timestamp(c.cycleEnd.seconds, c.cycleEnd.nanoseconds)
+              : undefined,
+        archivedAt:
+          c.archivedAt instanceof Timestamp
+            ? c.archivedAt
+            : c.archivedAt
+              ? new Timestamp(c.archivedAt.seconds, c.archivedAt.nanoseconds)
+              : undefined,
+      }));
+
+      setHistory(restoredData);
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      setHasMore(snapshot.docs.length === PAGE_SIZE);
+      setLoading(false);
+
+      // Save fresh data to cache
+      saveHistoryToStorage(restoredData);
+    },
+    [saveHistoryToStorage],
+  );
 
   const fetchMoreHistory = async () => {
     if (!hasMore || loadingMore || !lastDoc) return;
     setLoadingMore(true);
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      setLoadingMore(false);
+      return;
+    }
+
     const historyRef = collection(db, "historyLogs", user.uid, "cycles");
     const q = query(
       historyRef,
       orderBy("archivedAt", "desc"),
       startAfter(lastDoc),
-      limit(PAGE_SIZE)
+      limit(PAGE_SIZE),
     );
+
     const snapshot = await getDocs(q);
 
     const data = snapshot.docs.map((doc) => ({
@@ -103,25 +202,60 @@ const History = () => {
       ...doc.data(),
     })) as HistoryCycle[];
 
-    setHistory((prev) => [...prev, ...data]);
+    const restoredData = data.map((c) => ({
+      ...c,
+      cycleStart:
+        c.cycleStart instanceof Timestamp
+          ? c.cycleStart
+          : c.cycleStart
+            ? new Timestamp(c.cycleStart.seconds, c.cycleStart.nanoseconds)
+            : undefined,
+      cycleEnd:
+        c.cycleEnd instanceof Timestamp
+          ? c.cycleEnd
+          : c.cycleEnd
+            ? new Timestamp(c.cycleEnd.seconds, c.cycleEnd.nanoseconds)
+            : undefined,
+      archivedAt:
+        c.archivedAt instanceof Timestamp
+          ? c.archivedAt
+          : c.archivedAt
+            ? new Timestamp(c.archivedAt.seconds, c.archivedAt.nanoseconds)
+            : undefined,
+    }));
+
+    setHistory((prev) => {
+      const merged = [...prev, ...restoredData];
+      saveHistoryToStorage(merged);
+      return merged;
+    });
+
     setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
     setHasMore(snapshot.docs.length === PAGE_SIZE);
     setLoadingMore(false);
   };
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged((user) => {
+    const unsub = auth.onAuthStateChanged(async (user) => {
       if (!user) {
         setHistory([]);
         setLoading(false);
         return;
       }
 
-      fetchInitialHistory(user.uid);
+      // Load from cache first
+      const cached = await loadHistoryFromStorage();
+      if (cached.length > 0) {
+        setHistory(cached);
+        setLoading(false);
+      }
+
+      // Fetch fresh data in background (showLoading false if cache exists)
+      await fetchInitialHistory(user.uid, cached.length === 0);
     });
 
     return () => unsub();
-  }, []);
+  }, [fetchInitialHistory, loadHistoryFromStorage]);
 
   const openCycleModal = (cycle: HistoryCycle) => {
     setSelectedCycle(cycle);
@@ -141,12 +275,8 @@ const History = () => {
 
     return (
       <InsightsCard
-        title={`Cycle: ${formatDate(item.cycleStart)} - ${formatDate(
-          item.cycleEnd
-        )}`}
-        description={`Completed Logs: ${item.completedLogs}/${
-          item.logs?.length || 0
-        }`}
+        title={`Cycle: ${formatDate(item.cycleStart)} - ${formatDate(item.cycleEnd)}`}
+        description={`Completed Logs: ${item.completedLogs}/${item.logs?.length || 0}`}
         time={`Archived: ${formatTime(item.archivedAt)}`}
         onPress={() => openCycleModal(item)}
       />
@@ -156,9 +286,7 @@ const History = () => {
   const renderLogItem = ({ item }: { item: Log }) => (
     <InsightsCard
       title={item.intention || "Untitled Log"}
-      description={`Mood: ${item.mood} | Outcome: ${
-        item.outcome === null ? "Not Completed" : item.outcome
-      }`}
+      description={`Mood: ${item.mood} | Outcome: ${item.outcome ?? "Not Completed"}`}
       time={item.date}
       onPress={() => openLogModal(item)}
     />
@@ -196,7 +324,7 @@ const History = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Cycle Details</Text>
             <Text style={styles.modalSub}>
-              Logs: {selectedCycle.completedLogs} / {selectedCycle.logs?.length}
+              Logs: {selectedCycle.completedLogs}/{selectedCycle.logs?.length}
             </Text>
 
             <FlatList
@@ -216,6 +344,7 @@ const History = () => {
         {selectedLog && (
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{selectedLog.intention}</Text>
+
             <View style={styles.detailRow}>
               <Text style={styles.label}>Mood:</Text>
               <Text style={styles.value}>{selectedLog.mood}</Text>
@@ -224,9 +353,7 @@ const History = () => {
             <View style={styles.detailRow}>
               <Text style={styles.label}>Outcome:</Text>
               <Text style={styles.value}>
-                {selectedLog.outcome === null
-                  ? "Not Completed"
-                  : selectedLog.outcome}
+                {selectedLog.outcome ?? "Not Completed"}
               </Text>
             </View>
 

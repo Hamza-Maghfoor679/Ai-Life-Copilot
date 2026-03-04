@@ -15,7 +15,8 @@
     "android": {
       "package": "com.hamza.ailifecopilot",
       "googleServicesFile": "./google-services.json",
-      
+      "permissions": ["BILLING"],
+      "intentFilters": [],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

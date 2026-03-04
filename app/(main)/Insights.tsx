@@ -6,6 +6,7 @@ import InsightsCard from "@/src/reusables/InsightsCard";
 import CustomModal from "@/src/reusables/Modal";
 import { WeeklyReports } from "@/src/schemas/weeklyReportsSchema";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   collection,
   onSnapshot,
@@ -14,88 +15,153 @@ import {
   Timestamp,
   where,
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, ScrollView, Text, View } from "react-native";
+
+const REPORTS_CACHE_KEY = "weeklyReportsCache";
 
 const Insights = () => {
   const [selectedInsight, setSelectedInsight] = useState<WeeklyReports | null>(
-    null
+    null,
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFullInsightsModalOpen, setIsFullInsightsModalOpen] = useState(false);
   const [reports, setReports] = useState<WeeklyReports[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const uid = auth.currentUser?.uid;
+
+  // ---------- AsyncStorage helpers ----------
+  const saveReportsToStorage = useCallback(async (reports: WeeklyReports[]) => {
+    try {
+      await AsyncStorage.setItem(REPORTS_CACHE_KEY, JSON.stringify(reports));
+    } catch (e) {
+      console.error("Error saving reports to storage", e);
+    }
+  }, []);
+
+  const loadReportsFromStorage = useCallback(async (): Promise<
+    WeeklyReports[]
+  > => {
+    try {
+      const json = await AsyncStorage.getItem(REPORTS_CACHE_KEY);
+      if (!json) return [];
+
+      const parsed = JSON.parse(json);
+
+      // Re-hydrate the date fields
+      return parsed.map((report: any) => ({
+        ...report,
+        cycleStart:
+          report.cycleStart instanceof Timestamp
+            ? report.cycleStart
+            : new Timestamp(
+                report.cycleStart.seconds,
+                report.cycleStart.nanoseconds,
+              ),
+        cycleEnd:
+          report.cycleEnd instanceof Timestamp
+            ? report.cycleEnd
+            : new Timestamp(
+                report.cycleEnd.seconds,
+                report.cycleEnd.nanoseconds,
+              ),
+        generatedAt:
+          report.generatedAt instanceof Timestamp
+            ? report.generatedAt
+            : new Timestamp(
+                report.generatedAt.seconds,
+                report.generatedAt.nanoseconds,
+              ),
+      }));
+    } catch (e) {
+      console.error("Error loading reports from storage", e);
+      return [];
+    }
+  }, []);
+
+  // ---------- Load cached reports and set up listener ----------
   useEffect(() => {
     let unsubscribeReports: (() => void) | undefined;
 
-    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-      if (unsubscribeReports) unsubscribeReports();
-
-      if (!user) {
-        setReports([]);
+    const init = async () => {
+      const cachedReports = await loadReportsFromStorage();
+      if (cachedReports.length > 0) {
+        setReports(cachedReports);
         setLoading(false);
-        return;
       }
 
-      const currentUserId = user.uid;
+      if (!uid) return;
 
       const reportsRef = collection(db, "weeklyReports");
-
       const reportsQuery = query(
         reportsRef,
-        where("userId", "==", currentUserId),
-        orderBy("generatedAt", "desc")
+        where("userId", "==", uid),
+        orderBy("generatedAt", "desc"),
       );
 
       unsubscribeReports = onSnapshot(
         reportsQuery,
-        (querySnapshot) => {
-          const fetchedReports: WeeklyReports[] = querySnapshot.docs.map(
-            (doc) => {
-              const data = doc.data();
-              return {
-                userId: data.userId,
-                cycleStart: data.cycleStart as Timestamp,
-                cycleEnd: data.cycleEnd as Timestamp,
-                weeklyScore: data.weeklyScore,
-                consistencyLevel: data.consistencyLevel,
-                breakdown: data.breakdown,
-                aiInsights: data.aiInsights || [],
-                recommendation: data.recommendation || "",
-                generatedAt: data.generatedAt as Timestamp,
-              } as WeeklyReports;
-            }
-          );
+        (snapshot) => {
+          const fetchedReports: WeeklyReports[] = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              userId: data.userId,
+              cycleStart: data.cycleStart as Timestamp,
+              cycleEnd: data.cycleEnd as Timestamp,
+              weeklyScore: data.weeklyScore,
+              consistencyLevel: data.consistencyLevel,
+              breakdown: data.breakdown,
+              aiInsights: data.aiInsights || [],
+              recommendation: data.recommendation || "",
+              generatedAt: data.generatedAt as Timestamp,
+            } as WeeklyReports;
+          });
+
           setReports(fetchedReports);
+          saveReportsToStorage(fetchedReports);
           setLoading(false);
         },
         (error) => {
           console.error("Firestore Listener Error:", error);
           setLoading(false);
-        }
+        },
       );
-    });
+    };
+
+    void init();
 
     return () => {
-      unsubscribeAuth();
-      if (unsubscribeReports) unsubscribeReports();
+      if (unsubscribeReports) {
+        unsubscribeReports();
+      }
     };
-  }, []);
+  }, [uid, loadReportsFromStorage, saveReportsToStorage]);
 
-  const handleOpenModal = (report: WeeklyReports) => {
+  // ---------- Handlers ----------
+  const handleOpenModal = useCallback((report: WeeklyReports) => {
     setSelectedInsight(report);
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const renderReportItem = ({ item }: { item: WeeklyReports }) => (
-    <InsightsCard
-      title={`Week of ${item.cycleStart.toDate().toLocaleDateString()}`}
-      description={`Weekly Score: ${item.weeklyScore} • Consistency: ${item.consistencyLevel}`}
-      time={item.generatedAt.toDate().toLocaleString()}
-      onPress={() => handleOpenModal(item)}
-    />
+  const handleOpenFullInsights = useCallback(() => {
+    setIsFullInsightsModalOpen(true);
+  }, []);
+
+  const renderReportItem = useCallback(
+    ({ item }: { item: WeeklyReports }) => (
+      <InsightsCard
+        title={`Week of ${item.cycleStart.toDate().toLocaleDateString()}`}
+        description={`Weekly Score: ${item.weeklyScore} • Consistency: ${item.consistencyLevel}`}
+        time={item.generatedAt.toDate().toLocaleString()}
+        onPress={() => handleOpenModal(item)}
+      />
+    ),
+    [handleOpenModal],
   );
+
+  // ---------- Derived memoized values ----------
+  const hasReports = useMemo(() => reports.length > 0, [reports]);
 
   return (
     <>
@@ -114,7 +180,7 @@ const Insights = () => {
 
         {loading ? (
           <Text>Loading reports...</Text>
-        ) : reports.length === 0 ? (
+        ) : !hasReports ? (
           <Text>No reports found yet.</Text>
         ) : (
           <FlatList
@@ -127,7 +193,7 @@ const Insights = () => {
         )}
       </View>
 
-      {/* Main Modal - Short AI Insights */}
+      {/* Short AI Insights Modal */}
       <CustomModal visible={isModalOpen} onClose={() => setIsModalOpen(false)}>
         {selectedInsight && (
           <View>
@@ -198,7 +264,6 @@ const Insights = () => {
                 style={{ alignSelf: "center", marginVertical: 2 }}
                 size={20}
               />
-
               {selectedInsight.aiInsights.slice(0, 2).map((insight, index) => (
                 <Text
                   key={index}
@@ -209,7 +274,6 @@ const Insights = () => {
                   • {insight}
                 </Text>
               ))}
-
               {selectedInsight.aiInsights.length > 2 && (
                 <Text
                   style={{
@@ -218,7 +282,7 @@ const Insights = () => {
                     textAlign: "center",
                     marginTop: 8,
                   }}
-                  onPress={() => setIsFullInsightsModalOpen(true)}
+                  onPress={handleOpenFullInsights}
                 >
                   View All Insights
                 </Text>
@@ -226,15 +290,18 @@ const Insights = () => {
             </View>
 
             <Text
-              style={{ textAlign: "center", fontSize: 16, fontWeight: "800", textDecorationLine: 'underline' }}
+              style={{
+                textAlign: "center",
+                fontSize: 16,
+                fontWeight: "800",
+                textDecorationLine: "underline",
+              }}
             >
               Recommendation
             </Text>
-
             <Text style={[styles.recommendation, { fontWeight: "bold" }]}>
               {selectedInsight.recommendation}
             </Text>
-
           </View>
         )}
       </CustomModal>
@@ -251,7 +318,6 @@ const Insights = () => {
               style={{ maxHeight: "100%" }}
             >
               <Text style={styles.modalTitle}>All AI Insights</Text>
-
               <View style={styles.descriptionBox}>
                 {selectedInsight.aiInsights.map((insight, index) => (
                   <Text key={index} style={styles.modalDescription}>

@@ -4,11 +4,12 @@ import { Dimensions, StyleSheet, Text, View } from "react-native";
 const { width, height } = Dimensions.get("window");
 
 interface HeaderProps {
-  initialText?: string| null;
+  initialText?: string | null;
   children?: React.ReactNode;
+  secondaryText?: string;
 }
 
-const Header = ({initialText, children}: HeaderProps) => {
+const Header = ({ initialText, children, secondaryText }: HeaderProps) => {
   return (
     <View
       style={{
@@ -17,13 +18,14 @@ const Header = ({initialText, children}: HeaderProps) => {
         borderBottomEndRadius: 20,
         borderBottomStartRadius: 20,
         justifyContent: "flex-end",
-        padding: 20
+        padding: 20,
       }}
     >
-        <Text style={{ color: "white", fontSize: 22, fontWeight: "600" }}>
+      <Text style={{ color: "white", fontSize: 22, fontWeight: "600" }}>
         {initialText}
-        </Text>
-        {children}
+      </Text>
+      <Text style={{ color: "white" }}>{secondaryText}</Text>
+      {children}
     </View>
   );
 };

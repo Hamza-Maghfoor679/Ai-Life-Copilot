@@ -17,6 +17,8 @@ import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 
 export default function RootLayout() {
+  console.log("RevenueCat native module:", Purchases);
+
   const colorScheme = useColorScheme();
   const router = useRouter();
 

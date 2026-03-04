@@ -38,7 +38,7 @@ const MainIndex = () => {
   // Redux Data
   const user = useSelector((state: RootState) => state.user.user);
   const currentScore = useSelector(
-    (state: RootState) => state.user.user?.currentScore || 0
+    (state: RootState) => state.user.user?.currentScore || 0,
   );
 
   // --- Real-time Score Listener ---
@@ -61,7 +61,7 @@ const MainIndex = () => {
       },
       (error) => {
         console.error("Error listening to score updates:", error);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -69,58 +69,61 @@ const MainIndex = () => {
 
   const handleOpenModal = () => setIsOpen(true);
 
-const handleSetIntention = async () => {
-  if (!user || !plannedDuration) return;
-  
-  // Add this guard
-  if (!auth.currentUser?.uid) {
-    return Alert.alert("Error", "User not authenticated");
-  }
+  const handleSetIntention = async () => {
+    if (!user || !plannedDuration) return;
 
-  const difficultyMap: Record<string, "easy" | "medium" | "hard"> = {
-    Easy: "easy",
-    Medium: "medium",
-    Hard: "hard",
+    // Add this guard
+    if (!auth.currentUser?.uid) {
+      return Alert.alert("Error", "User not authenticated");
+    }
+
+    const difficultyMap: Record<string, "easy" | "medium" | "hard"> = {
+      Easy: "easy",
+      Medium: "medium",
+      Hard: "hard",
+    };
+
+    const moodMap = ["happy", "neutral", "sad", "angry", "tired"] as const;
+    const logRef = doc(collection(db, "dailyLogs"));
+
+    const dailyLog = cleanUndefined({
+      id: logRef.id,
+      userId: auth.currentUser.uid,
+      date: new Date().toISOString().split("T")[0],
+      intention,
+      plannedDuration: plannedDuration * 60,
+      outcome: null,
+      difficulty: difficulty ? difficultyMap[difficulty] : undefined,
+      mood: selectedMood !== null ? moodMap[selectedMood] : undefined,
+      notes: notes.trim() ? notes : undefined,
+      completionQuality: null,
+      actualDuration: null,
+      createdAt: Timestamp.now(),
+    });
+
+    try {
+      setIsLoading(true);
+      await createDailyLog(dailyLog);
+      setIsOpen(false);
+      setIntention("");
+      setPlannedDuration(null);
+      setDifficulty(null);
+      setNotes("");
+      setSelectedMood(null);
+      setIsLoading(false);
+      Alert.alert("Success", `Your intention "${intention}" has been saved.`);
+    } catch (error) {
+      console.error("Error saving daily log:", error);
+      setIsLoading(false);
+    }
   };
-
-  const moodMap = ["happy", "neutral", "sad", "angry", "tired"] as const;
-  const logRef = doc(collection(db, "dailyLogs"));
-
-  const dailyLog = cleanUndefined({
-    id: logRef.id,
-    userId: auth.currentUser.uid,
-    date: new Date().toISOString().split("T")[0],
-    intention,
-    plannedDuration: plannedDuration * 60,
-    outcome: null,
-    difficulty: difficulty ? difficultyMap[difficulty] : undefined,
-    mood: selectedMood !== null ? moodMap[selectedMood] : undefined,
-    notes: notes.trim() ? notes : undefined,
-    completionQuality: null,
-    actualDuration: null,
-    createdAt: Timestamp.now(),
-  });
-
-  try {
-    setIsLoading(true);
-    await createDailyLog(dailyLog);
-    setIsOpen(false);
-    setIntention("");
-    setPlannedDuration(null);
-    setDifficulty(null);
-    setNotes("");
-    setSelectedMood(null);
-    setIsLoading(false);
-    Alert.alert("Success", `Your intention "${intention}" has been saved.`);
-  } catch (error) {
-    console.error("Error saving daily log:", error);
-    setIsLoading(false);
-  }
-};
 
   return (
     <>
-      <Header initialText={`Welcome ${user?.name || "User"}`} />
+      <Header
+        initialText={`Hello, ${user?.name}`}
+        secondaryText="Ready for your 1% today?"
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -145,24 +148,25 @@ const handleSetIntention = async () => {
               </Text>
             </View>
 
-            <Text style={styles.text}>What is your intention for today?</Text>
-            <Text style={styles.trackText}>
-              (Let’s see you deserve what you want!)
-            </Text>
-
             <View style={styles.trackContainer}>
+              <Text style={styles.text}>What is your focus for today?</Text>
+              <Text style={styles.trackText}>
+                (One small intention, 1% closer to your best self.)
+              </Text>
               <TextInput
                 value={intention}
                 onChangeText={setIntention}
                 multiline
-                placeholder="Write your desire here..."
+                placeholder="e.g., Complete my deep work block..."
                 style={styles.textInput}
                 placeholderTextColor="#1e2631"
                 onSubmitEditing={() => Keyboard.dismiss()}
               />
 
               <View style={styles.moodTrackerContainer}>
-                <Text style={styles.moodTrackerText}>How are you feeling today?</Text>
+                <Text style={styles.moodTrackerText}>
+                  Check in with yourself. How's your energy?
+                </Text>
                 <View style={styles.moodRow}>
                   {["😃", "😐", "😔", "😡", "😓"].map((emoji, index) => (
                     <TouchableOpacity
@@ -179,7 +183,7 @@ const handleSetIntention = async () => {
                 </View>
 
                 <DefaultButton
-                  title="Lets Do It"
+                  title="Set Intention"
                   style={{
                     width: "100%",
                     marginTop: 16,

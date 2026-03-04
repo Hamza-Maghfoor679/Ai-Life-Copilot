@@ -5,11 +5,8 @@ import {
   GoogleAuthProvider,
   initializeAuth,
 } from "firebase/auth";
-import {
-  getFirestore
-} from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
-
 
 const firebaseConfig = {
   apiKey: "AIzaSyACOBhSe6me2spW24d_eIaceijJIuOTJJU",
@@ -25,7 +22,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 const functions = getFunctions(app);
-
 
 // Auth (React Native persistence)
 const auth = initializeAuth(app, {
